@@ -20,7 +20,7 @@
             </flux:navlist.group>
             <flux:navlist.group :heading="__('User Management')" class="grid">
                 <flux:navlist.item icon="home" :href="route('list-toko')" :current="request()->routeIs('list-toko')"
-                    wire:navigate>{{ __('list toko') }}</flux:navlist.item>
+                    wire:navigate>{{ __('List Toko & Gudang') }}</flux:navlist.item>
                     <flux:navlist.item icon="home" :href="route('users')" :current="request()->routeIs('users')"
                     wire:navigate>{{ __('User') }}</flux:navlist.item>
             </flux:navlist.group>

@@ -6,15 +6,16 @@ use Livewire\Component;
 use Livewire\WithPagination;
 use Illuminate\Support\Facades\DB;
 use App\Models\{
-    productsModels as Product,
-    categoriesModels as Category,
-    pricesModels as Price,
+    produkModel as Product,
+    kategoriModel as Category,
+    hargaModel as Price,
     stockModels as Stock,
-    branchesModel as Branch,
-    warehosesModels as Warehouse,
+    cabangModel as Branch,
+    gudangModel as Warehouse,
     salesModels as Sale,
     saleitemsModels as SaleItem
 };
+use Illuminate\Support\Facades\Auth;
 
 class POS extends Component
 {
@@ -33,11 +34,16 @@ class POS extends Component
     // Cart
     public array $cart = [];
 
+    // Price Selection Modal
+    public bool $showPriceModal = false;
+    public $selectedProduct = null;
+    public array $availablePrices = [];
+
     // Checkout
     public bool $showCheckout = false;
     public string $customerName = 'Umum';
     public float $paymentAmount = 0;
-    public string $paymentMethod = '';
+    public string $paymentMethod = 'cash';
 
     protected $listeners = ['productAdded' => 'addToCart'];
 
@@ -48,7 +54,7 @@ class POS extends Component
         // set default branch & warehouse (cari head office dulu)
         $this->activeBranch = Branch::where('is_head_office', true)->first() ?? Branch::first();
         $this->activeWarehouse = $this->activeBranch
-            ? $this->activeBranch->toWarehouses()->where('is_main', true)->first() ?? $this->activeBranch->toWarehouses()->first()
+            ? $this->activeBranch->toGudang()->where('is_main', true)->first() ?? $this->activeBranch->toGudang()->first()
             : null;
     }
 
@@ -63,21 +69,28 @@ class POS extends Component
 
         $products = Product::query()
             ->with([
-                'toCategory',
-                'toSupplier',
-                'toPrices' => function ($q) {
+                'toKategori',
+                'toHarga' => function ($q) {
                     if ($this->activeBranch) {
-                        $q->where('branch_id', $this->activeBranch->id);
+                        $q->where('branch_id', $this->activeBranch->id)
+                            ->where(function ($query) {
+                                $query->whereNull('valid_from')
+                                    ->orWhere('valid_from', '<=', now());
+                            })
+                            ->where(function ($query) {
+                                $query->whereNull('valid_until')
+                                    ->orWhere('valid_until', '>=', now());
+                            })
+                            ->orderBy('unit_qty', 'asc'); // urutkan dari qty terkecil
+                    }
+                },
+                'toStocks' => function ($q) {
+                    if ($this->activeWarehouse) {
+                        $q->where('warehouse_id', $this->activeWarehouse->id);
                     }
                 }
             ])
-            ->when($this->search, function ($q) {
-                $q->where(function ($sub) {
-                    $sub->where('name', 'like', "%{$this->search}%")
-                        ->orWhere('code', 'like', "%{$this->search}%")
-                        ->orWhere('barcode', 'like', "%{$this->search}%");
-                });
-            })
+            ->search($this->search)
             ->when($this->barcode, fn($q) => $q->where('barcode', $this->barcode))
             ->when($this->activeCategory !== 'all', fn($q) => $q->where('category_id', $this->activeCategory))
             ->where('is_active', true)
@@ -106,7 +119,7 @@ class POS extends Component
 
         $product = Product::where('barcode', $value)->first();
         if ($product) {
-            $this->addToCart($product->id);
+            $this->openPriceSelection($product->id);
             $this->barcode = '';
         } else {
             $this->flashError('Produk tidak ditemukan!');
@@ -114,15 +127,23 @@ class POS extends Component
     }
 
     // ---------------------------
-    // Cart management
+    // Price Selection Modal
     // ---------------------------
-    public function addToCart($productId)
+    public function openPriceSelection($productId)
     {
-        // load product with price (branch) and stock (warehouse)
-        $product = Product::with([
-            'toPrices' => function ($q) {
+        $this->selectedProduct = Product::with([
+            'toHarga' => function ($q) {
                 if ($this->activeBranch) {
-                    $q->where('branch_id', $this->activeBranch->id)->where('is_default', true);
+                    $q->where('branch_id', $this->activeBranch->id)
+                        ->where(function ($query) {
+                            $query->whereNull('valid_from')
+                                ->orWhere('valid_from', '<=', now());
+                        })
+                        ->where(function ($query) {
+                            $query->whereNull('valid_until')
+                                ->orWhere('valid_until', '>=', now());
+                        })
+                        ->orderBy('unit_qty', 'asc');
                 }
             },
             'toStocks' => function ($q) {
@@ -132,81 +153,161 @@ class POS extends Component
             }
         ])->find($productId);
 
-        if (! $product) {
+        if (!$this->selectedProduct) {
             $this->flashError('Produk tidak ditemukan!');
             return;
         }
 
-        $price = $product->toPrices->first()?->price ?? 0;
-        $stockQty = $product->toStocks->first()?->quantity ?? 0;
+        $stockQty = $this->selectedProduct->toStocks->first()?->quantity ?? 0;
 
         if ($stockQty <= 0) {
             $this->flashError('Stok produk habis!');
             return;
         }
 
-        $existingIndex = array_search($product->id, array_column($this->cart, 'id'));
+        // Ambil semua tier harga yang tersedia
+        $this->availablePrices = $this->selectedProduct->toHarga->map(function ($price) use ($stockQty) {
+            $unitQty = $price->unit_qty ?? 1;
+            return [
+                'id' => $price->id,
+                'unit_name' => $price->unit_name ?? 'Pcs',
+                'unit_qty' => $unitQty,
+                'price' => $price->price,
+                'old_price' => $price->old_price,
+                'is_default' => $price->is_default ?? false,
+                'available' => $stockQty >= $unitQty,
+                'notes' => $price->notes
+            ];
+        })->toArray();
 
-        if ($existingIndex !== false) {
-            // already in cart
-            if ($this->cart[$existingIndex]['quantity'] < $stockQty) {
-                $this->cart[$existingIndex]['quantity']++;
+        // Jika tidak ada harga, tampilkan error
+        if (count($this->availablePrices) === 0) {
+            $this->flashError('Produk belum memiliki harga!');
+            return;
+        }
+
+        // Jika hanya ada 1 harga, langsung add to cart
+        if (count($this->availablePrices) === 1) {
+            $this->addToCartWithPrice(0);
+            return;
+        }
+
+        $this->showPriceModal = true;
+    }
+
+    public function closePriceModal()
+    {
+        $this->showPriceModal = false;
+        $this->selectedProduct = null;
+        $this->availablePrices = [];
+    }
+
+    public function addToCartWithPrice($priceIndex)
+    {
+        if (!isset($this->availablePrices[$priceIndex])) {
+            $this->flashError('Harga tidak valid!');
+            return;
+        }
+
+        $selectedPrice = $this->availablePrices[$priceIndex];
+        $stockQty = $this->selectedProduct->toStocks->first()?->quantity ?? 0;
+
+        // Validasi stok untuk unit_qty
+        if ($stockQty < $selectedPrice['unit_qty']) {
+            $this->flashError('Stok tidak mencukupi untuk harga ini!');
+            return;
+        }
+
+        // Cek apakah produk dengan tier yang sama sudah ada di cart
+        $existingIndex = null;
+        foreach ($this->cart as $index => $item) {
+            if (
+                $item['id'] === $this->selectedProduct->id &&
+                $item['price_id'] === $selectedPrice['id']
+            ) {
+                $existingIndex = $index;
+                break;
+            }
+        }
+
+        if ($existingIndex !== null) {
+            // Update quantity dengan kelipatan unit_qty
+            $newQty = $this->cart[$existingIndex]['quantity'] + $selectedPrice['unit_qty'];
+            if ($newQty <= $stockQty) {
+                $this->cart[$existingIndex]['quantity'] = $newQty;
             } else {
                 $this->flashError('Stok tidak mencukupi!');
+                $this->closePriceModal();
                 return;
             }
         } else {
-            // add new item
+            // Add new item dengan quantity = unit_qty
             $this->cart[] = [
-                'id'       => $product->id,
-                'name'     => $product->name,
-                'price'    => $price,
-                'quantity' => 1,
-                'stock'    => $stockQty,
-                'unit'     => $product->toPrices->first()?->unit_name ?? null
+                'id'         => $this->selectedProduct->id,
+                'price_id'   => $selectedPrice['id'],
+                'name'       => $this->selectedProduct->name,
+                'price'      => $selectedPrice['price'],
+                'quantity'   => $selectedPrice['unit_qty'],
+                'unit_qty'   => $selectedPrice['unit_qty'],
+                'stock'      => $stockQty,
+                'unit'       => $selectedPrice['unit_name'],
+                'tier_label' => $this->formatTierLabel($selectedPrice)
             ];
         }
 
         $this->saveCart();
-        $this->flashSuccess('Produk ditambahkan ke keranjang!');
+        $this->flashSuccess('✓ ' . $this->selectedProduct->name . ' ditambahkan (' . $this->formatTierLabel($selectedPrice) . ')');
+        $this->closePriceModal();
+    }
+
+    private function formatTierLabel($price)
+    {
+        if ($price['unit_qty'] == 1) {
+            return $price['unit_name'];
+        }
+        return $price['unit_name'] . ' (' . $price['unit_qty'] . ' item)';
+    }
+
+    // ---------------------------
+    // Cart management
+    // ---------------------------
+    public function addToCart($productId)
+    {
+        $this->openPriceSelection($productId);
     }
 
     public function updateQuantity(int $index, string $action)
     {
         if (! isset($this->cart[$index])) return;
 
+        $unitQty = $this->cart[$index]['unit_qty'] ?? 1;
+
         if ($action === 'increment') {
-            $this->incrementQuantity($index);
+            $newQty = $this->cart[$index]['quantity'] + $unitQty;
+            if ($newQty <= $this->cart[$index]['stock']) {
+                $this->cart[$index]['quantity'] = $newQty;
+            } else {
+                $this->flashError('Stok tidak mencukupi!');
+                return;
+            }
         } elseif ($action === 'decrement') {
-            $this->decrementQuantity($index);
+            $newQty = $this->cart[$index]['quantity'] - $unitQty;
+            if ($newQty >= $unitQty) {
+                $this->cart[$index]['quantity'] = $newQty;
+            } else {
+                $this->removeFromCart($index);
+                return;
+            }
         }
 
         $this->saveCart();
-    }
-
-    protected function incrementQuantity(int $index)
-    {
-        if ($this->cart[$index]['quantity'] < $this->cart[$index]['stock']) {
-            $this->cart[$index]['quantity']++;
-        } else {
-            $this->flashError('Stok tidak mencukupi!');
-        }
-    }
-
-    protected function decrementQuantity(int $index)
-    {
-        if ($this->cart[$index]['quantity'] > 1) {
-            $this->cart[$index]['quantity']--;
-        } else {
-            $this->removeFromCart($index);
-        }
     }
 
     public function removeFromCart(int $index)
     {
         if (isset($this->cart[$index])) {
             unset($this->cart[$index]);
-            $this->cart = array_values($this->cart); // reindex
+            $this->cart = array_values($this->cart);
             $this->saveCart();
             $this->flashSuccess('Produk dihapus dari keranjang!');
         }
@@ -247,11 +348,20 @@ class POS extends Component
         $this->dispatch('refreshPaymentAmount');
     }
 
+    public function updatePaymentMethod()
+    {
+        if ($this->paymentMethod == 'qris') {
+            $this->paymentAmount = $this->getTotal();
+            $this->dispatch('refreshPaymentAmount');
+        }
+    }
+
     public function processPayment()
     {
         // validate
+
         $this->validate([
-            'customerName' => 'required|string|max:255',
+            // 'customerName' => 'required|string|max:255',
             'paymentAmount' => 'required|numeric|min:' . $this->getTotal(),
             'paymentMethod' => 'required|string'
         ], [
@@ -259,62 +369,58 @@ class POS extends Component
             'paymentMethod.required' => 'Pilih metode pembayaran!'
         ]);
 
+
         DB::beginTransaction();
 
         try {
-            // create sale header (salesModels)
+            // create sale header
             $sale = Sale::create([
-                'branch_id'     => $this->activeBranch?->id,
-                'cashier_id'    => auth()->id(),
-                'sale_date'     => now(),
-                'subtotal'      => $this->getTotal(),
-                'total_amount'  => $this->getTotal(),
-                'discount_total'=> 0,
-                'payment_method'=> $this->paymentMethod,
-                'status'        => 'paid',
-                'notes'         => 'customer: ' . $this->customerName . ' | paid: ' . number_format($this->paymentAmount,0,',','.') . ' | change: ' . number_format($this->getChange(),0,',','.')
+                'branch_id'      => $this->activeBranch?->id,
+                'cashier_id'     => Auth::user()->id,
+                'sale_date'      => now(),
+                'subtotal'       => $this->getTotal(),
+                'total_amount'   => $this->getTotal(),
+                'discount_total' => 0,
+                'payment_method' => $this->paymentMethod,
+                'status'         => 'paid',
+                'notes'          => 'Customer: ' . ' | Bayar: Rp ' . number_format($this->paymentAmount, 0, ',', '.') . ' | Kembalian: Rp ' . number_format($this->getChange(), 0, ',', '.')
             ]);
 
-            // create items and decrement stock per warehouse
+            // create items and decrement stock
             foreach ($this->cart as $item) {
                 SaleItem::create([
                     'sale_id'    => $sale->id,
                     'product_id' => $item['id'],
-                    'unit_name'  => $item['unit'] ?? null,
+                    'unit_name'  => $item['tier_label'],
                     'quantity'   => $item['quantity'],
                     'price'      => $item['price'],
                     'discount'   => 0,
                     'subtotal'   => $item['price'] * $item['quantity'],
                 ]);
 
-                // update stockModels for active warehouse
+                // update stock
                 if ($this->activeWarehouse) {
                     $stock = Stock::where('product_id', $item['id'])
                         ->where('warehouse_id', $this->activeWarehouse->id)
                         ->first();
 
                     if ($stock) {
-                        // decrement quantity safely
                         $decrement = min($stock->quantity, $item['quantity']);
                         $stock->decrement('quantity', $decrement);
-                    }
-                } else {
-                    // fallback: if no warehouse active, try global stock decrement on product (if you have column)
-                    if (isset($item['stock'])) {
-                        // no-op here; adapt if you keep global stock on products
                     }
                 }
             }
 
             DB::commit();
 
-            $this->flashSuccess('Transaksi berhasil! Kembalian: Rp ' . number_format($this->getChange(), 0, ',', '.'));
+            $this->flashSuccess('✓ Transaksi berhasil! Kembalian: Rp ' . number_format($this->getChange(), 0, ',', '.'));
 
-            // reset cart & checkout states
+            // reset
+            $this->closeCheckout();
             $this->resetCart();
             $this->reset(['showCheckout', 'customerName', 'paymentAmount', 'paymentMethod']);
-
         } catch (\Throwable $e) {
+            $this->closeCheckout();
             DB::rollBack();
             $this->flashError('Terjadi kesalahan: ' . $e->getMessage());
         }

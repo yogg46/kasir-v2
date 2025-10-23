@@ -17,8 +17,8 @@ class deliveryOrderItemsModels extends Model
     {
         return $this->belongsTo(deliveryOrdersModels::class, 'delivery_order_id');
     }
-    public function toProduct()
+    public function toProduk()
     {
-        return $this->belongsTo(productsModels::class, 'product_id');
+        return $this->belongsTo(produkModel::class, 'product_id');
     }
 }

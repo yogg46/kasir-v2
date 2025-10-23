@@ -66,9 +66,9 @@ class purchaseOrdersModels extends Model
     {
         return $this->belongsTo(supliersModels::class, 'suplier_id');
     }
-    public function toWarehouse()
+    public function toGudang()
     {
-        return $this->belongsTo(warehosesModels::class, 'warehouse_id');
+        return $this->belongsTo(gudangModel::class, 'warehouse_id');
     }
     public function toItems()
     {

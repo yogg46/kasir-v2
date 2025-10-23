@@ -70,8 +70,8 @@ class supliersModels extends Model
         });
     }
 
-    public function toProducts()
+    public function toProduk()
     {
-        return $this->hasMany(productsModels::class, 'suplier_id');
+        return $this->hasMany(produkModel::class, 'suplier_id');
     }
 }

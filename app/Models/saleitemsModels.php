@@ -17,8 +17,8 @@ class saleitemsModels extends Model
     {
         return $this->belongsTo(salesModels::class, 'sale_id');
     }
-    public function toProduct()
+    public function toProduk()
     {
-        return $this->belongsTo(productsModels::class, 'product_id');
+        return $this->belongsTo(produkModel::class, 'product_id');
     }
 }

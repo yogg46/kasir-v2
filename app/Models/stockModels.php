@@ -13,16 +13,16 @@ class stockModels extends Model
     protected $table = 'stock_models';
     protected $fillable = ['product_id', 'warehouse_id', 'branch_id', 'quantity'];
 
-    public function toProduct()
+    public function toProduk()
     {
-        return $this->belongsTo(productsModels::class, 'product_id');
+        return $this->belongsTo(produkModel::class, 'product_id');
     }
-    public function toWarehouse()
+    public function toGudang()
     {
-        return $this->belongsTo(warehosesModels::class, 'warehouse_id');
+        return $this->belongsTo(gudangModel::class, 'warehouse_id');
     }
-    public function toBranch()
+    public function toCabang()
     {
-        return $this->belongsTo(branchesModel::class, 'branch_id');
+        return $this->belongsTo(cabangModel::class, 'branch_id');
     }
 }

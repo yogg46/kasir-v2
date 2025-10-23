@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
-class discountsModels extends Model
+class diskonModel extends Model
 {
     use HasFactory, HasUuids;
 
@@ -33,16 +33,16 @@ class discountsModels extends Model
     }
 
     // 🔗 Relasi
-    public function toPrice()
+    public function toHarga()
     {
-        return $this->belongsTo(pricesModels::class, 'price_id');
+        return $this->belongsTo(hargaModel::class, 'price_id');
     }
-    public function toBranch()
+    public function toCabang()
     {
-        return $this->belongsTo(branchesModel::class, 'branch_id');
+        return $this->belongsTo(cabangModel::class, 'branch_id');
     }
-    public function toProduct()
+    public function toProduk()
     {
-        return $this->belongsTo(productsModels::class, 'product_id');
+        return $this->belongsTo(produkModel::class, 'product_id');
     }
 }

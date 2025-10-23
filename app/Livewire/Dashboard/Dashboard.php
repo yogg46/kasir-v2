@@ -6,10 +6,12 @@ use Livewire\Component;
 use App\Models\salesModels;
 use App\Models\stockModels;
 use App\Models\branchesModel;
+use App\Models\cabangModel;
 use App\Models\productsModels;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use App\Models\notificationsModels;
+use App\Models\produkModel;
 
 class Dashboard extends Component
 {
@@ -29,16 +31,16 @@ class Dashboard extends Component
     public function loadData()
     {
         // 📦 Total Produk Aktif
-        $this->totalProducts = productsModels::where('is_active', true)->count();
+        $this->totalProducts = produkModel::where('is_active', true)->count();
 
         // 🏢 Total Cabang
-        $this->totalBranches = branchesModel::count();
+        $this->totalBranches = cabangModel::count();
 
         // 💰 Total Penjualan Hari Ini
         $this->todaySalesTotal = salesModels::whereDate('sale_date', Carbon::today())->sum('total_amount');
 
         // 🏬 Stok Menipis (stok < 10)
-        $this->lowStockProducts = stockModels::with('toProduct')
+        $this->lowStockProducts = stockModels::with('toProduk')
             ->where('quantity', '<', 10)
             ->orderBy('quantity')
             ->limit(10)

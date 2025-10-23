@@ -38,8 +38,8 @@ class notificationsModels extends Model
     {
         return $this->belongsTo(User::class, 'user_id');
     }
-    public function toBranch()
+    public function toCabang()
     {
-        return $this->belongsTo(branchesModel::class, 'branch_id');
+        return $this->belongsTo(cabangModel::class, 'branch_id');
     }
 }

@@ -2,6 +2,8 @@
 
 namespace Database\Seeders;
 
+use App\Models\branchesModel;
+use App\Models\cabangModel;
 use App\Models\roleModels;
 use App\Models\User;
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
@@ -16,7 +18,7 @@ class DatabaseSeeder extends Seeder
     {
         // User::factory(10)->create();
 
-
+        $this->call(ProdectStockSeeder::class);
 
         roleModels::create(['role' => 'admin']);
         roleModels::create(['role' => 'kasir']);
@@ -26,13 +28,14 @@ class DatabaseSeeder extends Seeder
 
         // User
 
+        $idB = cabangModel::where('name', 'Cabang Utama Surakarta')->first();
         User::create([
             'name' => 'Admin',
             // 'email' => 'admin@admin.com',
             'username' => 'admin',
             'password' => bcrypt('password'),
             'role_id' => 1,
-            'branch_id' => null,
+            'branch_id' => $idB->id,
         ]);
 
         User::create([
@@ -41,7 +44,7 @@ class DatabaseSeeder extends Seeder
             'username' => 'kasir',
             'password' => bcrypt('password'),
             'role_id' => 2,
-            'branch_id' => null,
+            'branch_id' => $idB->id,
         ]);
         User::create([
             'name' => 'Gudang',
@@ -49,7 +52,7 @@ class DatabaseSeeder extends Seeder
             'username' => 'gudang',
             'password' => bcrypt('password'),
             'role_id' => 3,
-            'branch_id' => null,
+            'branch_id' =>  $idB->id,
         ]);
         User::create([
             'name' => 'Manajer',
@@ -57,7 +60,7 @@ class DatabaseSeeder extends Seeder
             'username' => 'manajer',
             'password' => bcrypt('password'),
             'role_id' => 4,
-            'branch_id' => null,
+            'branch_id' =>  $idB->id,
         ]);
         User::create([
             'name' => 'Owner',
@@ -65,9 +68,7 @@ class DatabaseSeeder extends Seeder
             'username' => 'owner',
             'password' => bcrypt('password'),
             'role_id' => 5,
-            'branch_id' => null,
+            'branch_id' =>  $idB->id,
         ]);
-
-        $this->call(ProdectStockSeeder::class);
     }
 }

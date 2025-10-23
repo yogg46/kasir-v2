@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('products_models', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->foreignUuid('category_id')->constrained('categories_models')->onDelete('cascade'); // FK ke categories_models
-            $table->foreignUuid('suplier_id')->nullable()->constrained('supliers_models')->onDelete('set null'); // opsional jika produk tidak memiliki suplier
+            // $table->foreignUuid('suplier_id')->nullable()->constrained('supliers_models')->onDelete('set null'); // opsional jika produk tidak memiliki suplier
             $table->string('code')->unique();
             $table->string('name');
             $table->text('description')->nullable();

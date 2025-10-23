@@ -28,6 +28,7 @@ class User extends Authenticatable
         'username',
         'role_id',
         'branch_id',
+        'appearance'
     ];
 
     /**
@@ -72,7 +73,7 @@ class User extends Authenticatable
         if (!$keyword) return $query;
         return $query->where(function ($q) use ($keyword) {
             $q->orWhere('name', 'like', "%{$keyword}%")
-                ->orWhere('email', 'like', "%{$keyword}%")
+              
                 ->orWhere('username', 'like', "%{$keyword}%");
         });
     }
@@ -81,8 +82,8 @@ class User extends Authenticatable
     {
         return $this->belongsTo(roleModels::class, 'role_id');
     }
-    public function toBranch()
+    public function toCabang()
     {
-        return $this->belongsTo(branchesModel::class, 'branch_id');
+        return $this->belongsTo(cabangModel::class, 'branch_id');
     }
 }

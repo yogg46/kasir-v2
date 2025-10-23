@@ -47,13 +47,13 @@ class deliveryOrdersModels extends Model
         });
     }
 
-    public function toWarehouseFrom()
+    public function toGudangFrom()
     {
-        return $this->belongsTo(warehosesModels::class, 'warehose_from');
+        return $this->belongsTo(gudangModel::class, 'warehose_from');
     }
-    public function toWarehouseTo()
+    public function toGudangTo()
     {
-        return $this->belongsTo(warehosesModels::class, 'warehose_to');
+        return $this->belongsTo(gudangModel::class, 'warehose_to');
     }
     public function toItems()
     {

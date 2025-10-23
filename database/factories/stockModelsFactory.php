@@ -4,7 +4,9 @@ namespace Database\Factories;
 
 use App\Models\stockModels;
 use App\Models\branchesModel;
+use App\Models\cabangModel;
 use App\Models\productsModels;
+use App\Models\produkModel;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -21,11 +23,11 @@ class stockModelsFactory extends Factory
 
     public function definition(): array
     {
-        $branch = branchesModel::inRandomOrder()->first();
-        $warehouse = $branch?->toWarehouses()?->inRandomOrder()?->first();
+        $branch = cabangModel::inRandomOrder()->first();
+        $warehouse = $branch?->toGudang()?->inRandomOrder()?->first();
 
         return [
-            'product_id'   => productsModels::inRandomOrder()->first()?->id,
+            'product_id'   => produkModel::inRandomOrder()->first()?->id,
             'warehouse_id' => $warehouse?->id,
             'branch_id'    => $branch?->id,
             'quantity'     => fake()->numberBetween(10, 300),
