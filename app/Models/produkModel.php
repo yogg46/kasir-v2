@@ -5,12 +5,15 @@ namespace App\Models;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
+
 class produkModel extends Model
 {
-    use HasFactory, HasUuids;
+    use HasFactory, HasUuids, SoftDeletes;
 
     protected $table = 'products_models';
     protected $fillable = [
@@ -74,6 +77,8 @@ class produkModel extends Model
     public function scopeSearch($query, $keyword)
     {
         if (!$keyword) return $query;
+
+        // Default: tidak include yang dihapus
         return $query->where(function ($q) use ($keyword) {
             $q->orWhere('code', 'like', "%{$keyword}%")
                 ->orWhere('name', 'like', "%{$keyword}%")
@@ -82,7 +87,19 @@ class produkModel extends Model
         });
     }
 
-    // 🔗 Relasi
+    // Scope baru untuk include trashed
+    public function scopeSearchWithTrashed($query, $keyword)
+    {
+        return $this->scopeSearch($query, $keyword)->withTrashed();
+    }
+
+    // Scope untuk hanya yang trashed
+    public function scopeOnlyDeleted($query)
+    {
+        return $query->onlyTrashed();
+    }
+
+    // 🔗 Relasiw
     public function toKategori()
     {
         return $this->belongsTo(kategoriModel::class, 'category_id');
@@ -102,5 +119,55 @@ class produkModel extends Model
     public function toBatches()
     {
         return $this->hasMany(batchModel::class, 'product_id');
+    }
+
+
+    // Accessor untuk status aktif/nonaktif
+    protected function isActiveText(): Attribute
+    {
+        return Attribute::make(
+            get: fn() => $this->is_active ? 'Aktif' : 'Nonaktif'
+        );
+    }
+
+    // Accessor untuk type badge color
+    protected function typeBadge(): Attribute
+    {
+        return Attribute::make(
+            get: fn() => match ($this->type) {
+                'umkm' => 'primary',
+                'seasonal' => 'warning',
+                'regular' => 'success',
+                default => 'secondary'
+            }
+        );
+    }
+
+    // Accessor untuk type label
+    protected function typeLabel(): Attribute
+    {
+        return Attribute::make(
+            get: fn() => match ($this->type) {
+                'umkm' => 'UMKM',
+                'seasonal' => 'Musiman',
+                'regular' => 'Regular',
+                default => 'Unknown'
+            }
+        );
+    }
+
+    // Total stok semua gudang
+    protected function totalStock(): Attribute
+    {
+        return Attribute::make(
+            get: fn() => $this->toStocks()->sum('quantity')
+        );
+    }
+
+    protected function deletedStatus(): Attribute
+    {
+        return Attribute::make(
+            get: fn() => $this->trashed() ? 'Dihapus' : 'Aktif'
+        );
     }
 }

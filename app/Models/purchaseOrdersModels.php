@@ -4,12 +4,14 @@ namespace App\Models;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class purchaseOrdersModels extends Model
 {
-    use HasFactory, HasUuids;
+    use HasFactory, HasUuids, SoftDeletes;
 
     protected $table = 'purchase_orders_models';
     protected $fillable = [
@@ -20,6 +22,10 @@ class purchaseOrdersModels extends Model
         'total',
         'status',
         'notes'
+    ];
+    protected $casts = [
+        'order_date' => 'datetime',
+        'total' => 'decimal:2',
     ];
 
     protected static function boot()
@@ -44,7 +50,7 @@ class purchaseOrdersModels extends Model
                 ->first();
 
             // Ambil nomor terakhir dari kode (setelah tanda "-")
-            if ($latest && preg_match('/-(\d+)$/', $latest->code, $matches)) {
+            if ($latest && preg_match('/-(\d+)$/', $latest->order_number, $matches)) {
                 $number = intval($matches[1]) + 1;
             } else {
                 $number = 1; // Reset ke 1 jika belum ada untuk hari ini
@@ -73,5 +79,41 @@ class purchaseOrdersModels extends Model
     public function toItems()
     {
         return $this->hasMany(purchaseOrderItemsModels::class, 'purchase_order_id');
+    }
+
+     // Total formatted
+    protected function totalFormatted(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => 'Rp ' . number_format($this->total, 0, ',', '.')
+        );
+    }
+
+    // Status badge
+    protected function statusBadge(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => match($this->status) {
+                'draf' => 'secondary',
+                'approved' => 'info',
+                'received' => 'success',
+                'cancelled' => 'danger',
+                default => 'secondary'
+            }
+        );
+    }
+
+    // Status label
+    protected function statusLabel(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => match($this->status) {
+                'draf' => 'Draft',
+                'approved' => 'Disetujui',
+                'received' => 'Diterima',
+                'cancelled' => 'Dibatalkan',
+                default => 'Unknown'
+            }
+        );
     }
 }

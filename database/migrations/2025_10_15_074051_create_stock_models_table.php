@@ -15,7 +15,7 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->foreignUuid('product_id')->constrained('products_models')->onDelete('cascade'); // FK ke products_models
             $table->foreignUuid('warehouse_id')->nullable()->constrained('warehoses_models')->onDelete('cascade'); // FK ke warehoses_models
-            $table->foreignUuid('branch_id')->nullable()->constrained('branches_models')->onDelete('cascade'); // FK ke branches_models
+            // $table->foreignUuid('branch_id')->nullable()->constrained('branches_models')->onDelete('cascade'); // FK ke branches_models
             $table->integer('quantity')->default(0);
             $table->timestamps();
         });

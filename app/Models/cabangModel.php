@@ -4,12 +4,13 @@ namespace App\Models;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class cabangModel extends Model
 {
-    use HasUuids, HasFactory;
+   use HasFactory, HasUuids, SoftDeletes;
     protected $table = 'branches_models';
     protected $fillable = ['code', 'name', 'address', 'phone', 'is_head_office'];
 
@@ -85,5 +86,15 @@ class cabangModel extends Model
     public function toHarga()
     {
         return $this->hasMany(hargaModel::class, 'branch_id');
+    }
+
+    public function toReturnsAsSource()
+    {
+        return $this->hasMany(returModel::class, 'source_branch_id');
+    }
+
+    public function toReturnsAsTarget()
+    {
+        return $this->hasMany(returModel::class, 'target_branch_id');
     }
 }

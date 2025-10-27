@@ -17,7 +17,7 @@ return new class extends Migration
             $table->foreignUuid('warehouse_id')->constrained('warehoses_models')->onDelete('cascade'); // FK ke warehoses_models
             $table->string('order_number')->unique();
             $table->date('order_date');
-            $table->integer('total')->default(0);
+             $table->decimal('total', 15, 2)->default(0);
             $table->enum('status',['draf','approved','received','cancelled'])->default('draf');
             $table->text('notes')->nullable();
             $table->timestamps();

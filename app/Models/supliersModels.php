@@ -4,12 +4,13 @@ namespace App\Models;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class supliersModels extends Model
 {
-    use HasUuids, HasFactory;
+   use HasFactory, HasUuids, SoftDeletes;
 
     protected $table = 'supliers_models';
     protected $fillable = ['code', 'name', 'address', 'phone'];

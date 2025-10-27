@@ -31,45 +31,12 @@
             </div>
         </div>
 
-        {{-- Grafik Penjualan (tanpa CDN) --}}
-        <div x-data="{
-            chart: null,
-            labels: @js($salesChart->pluck('date')),
-            data: @js($salesChart->pluck('total')),
-            init() {
-                import('https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js').then(module => {
-                    const Chart = module.Chart;
-                    const ctx = this.$refs.canvas.getContext('2d');
-                    this.chart = new Chart(ctx, {
-                        type: 'line',
-                        data: {
-                            labels: this.labels,
-                            datasets: [{
-                                label: 'Total Penjualan (Rp)',
-                                data: this.data,
-                                borderColor: '#3b82f6',
-                                backgroundColor: 'rgba(59,130,246,0.2)',
-                                tension: 0.4,
-                                fill: true
-                            }]
-                        },
-                        options: {
-                            plugins: { legend: { display: false } },
-                            scales: {
-                                y: {
-                                    beginAtZero: true,
-                                    ticks: {
-                                        callback: (v) => 'Rp ' + v.toLocaleString('id-ID')
-                                    }
-                                }
-                            }
-                        }
-                    });
-                });
-            }
-        }" class="bg-gray-900 p-4 rounded-xl shadow-sm border border-gray-800">
+        {{-- Grafik Penjualan --}}
+        <div class="bg-gray-900 p-4 rounded-xl shadow-sm border border-gray-800">
             <h2 class="font-semibold mb-2">📈 Penjualan 7 Hari Terakhir</h2>
-            <canvas x-ref="canvas" class="w-full h-52"></canvas>
+            <div style="position: relative; height: 300px;">
+                <canvas id="salesChart"></canvas>
+            </div>
         </div>
 
         {{-- Stok Menipis --}}
@@ -115,3 +82,52 @@
 
     </div>
 </div>
+
+@push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const ctx = document.getElementById('salesChart');
+        if (ctx) {
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: @json($salesChart->pluck('date')),
+                    datasets: [{
+                        label: 'Total Penjualan (Rp)',
+                        data: @json($salesChart->pluck('total')),
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59,130,246,0.2)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            labels: { color: '#9ca3af' }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                color: '#9ca3af',
+                                callback: (v) => 'Rp ' + v.toLocaleString('id-ID')
+                            },
+                            grid: { color: '#374151' }
+                        },
+                        x: {
+                            ticks: { color: '#9ca3af' },
+                            grid: { color: '#374151' }
+                        }
+                    }
+                }
+            });
+        }
+    });
+</script>
+@endpush

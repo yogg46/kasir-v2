@@ -26,6 +26,7 @@ class DatabaseSeeder extends Seeder
         roleModels::create(['role' => 'manajer']);
         roleModels::create(['role' => 'owner']);
 
+
         // User
 
         $idB = cabangModel::where('name', 'Cabang Utama Surakarta')->first();
@@ -70,5 +71,7 @@ class DatabaseSeeder extends Seeder
             'role_id' => 5,
             'branch_id' =>  $idB->id,
         ]);
+
+         $this->call(JualSeeder::class);
     }
 }

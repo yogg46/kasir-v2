@@ -4,12 +4,14 @@ namespace App\Models;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class batchModel extends Model
 {
-    use HasFactory, HasUuids;
+   use HasFactory, HasUuids, SoftDeletes;
 
     protected $table = 'batches_models';
     protected $fillable = ['product_id', 'warehouse_id', 'code', 'expiry_date', 'quantity'];
@@ -55,5 +57,40 @@ class batchModel extends Model
     {
         return $this->belongsTo(gudangModel::class, 'warehouse_id');
     }
-    //
+
+
+    // Cek apakah sudah expired
+    protected function isExpired(): Attribute
+    {
+        return Attribute::make(
+            get: fn() => $this->expiry_date
+                ? \Carbon\Carbon::parse($this->expiry_date)->isPast()
+                : false
+        );
+    }
+
+    // Hari sampai expired
+    protected function daysUntilExpiry(): Attribute
+    {
+        return Attribute::make(
+            get: fn() => $this->expiry_date
+                ? now()->diffInDays(\Carbon\Carbon::parse($this->expiry_date), false)
+                : null
+        );
+    }
+
+    // Status expiry (good/warning/danger)
+    protected function expiryStatus(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                if (!$this->expiry_date) return 'no-expiry';
+                $days = $this->days_until_expiry;
+                if ($days < 0) return 'expired';
+                if ($days <= 30) return 'danger';
+                if ($days <= 90) return 'warning';
+                return 'good';
+            }
+        );
+    }
 }

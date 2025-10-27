@@ -29,7 +29,7 @@ class stockModelsFactory extends Factory
         return [
             'product_id'   => produkModel::inRandomOrder()->first()?->id,
             'warehouse_id' => $warehouse?->id,
-            'branch_id'    => $branch?->id,
+            // 'branch_id'    => $branch?->id,
             'quantity'     => fake()->numberBetween(10, 300),
         ];
     }

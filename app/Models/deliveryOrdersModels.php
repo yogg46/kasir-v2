@@ -4,13 +4,13 @@ namespace App\Models;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class deliveryOrdersModels extends Model
 {
-    use HasFactory, HasUuids;
-
+    use HasFactory, HasUuids, SoftDeletes;
     protected $table = 'delivery_orders_models';
     protected $fillable = ['warehose_from', 'warehose_to', 'delivery_number', 'delivery_date', 'status', 'notes'];
 
@@ -36,7 +36,7 @@ class deliveryOrdersModels extends Model
                 ->first();
 
             // Ambil nomor terakhir dari kode (setelah tanda "-")
-            if ($latest && preg_match('/-(\d+)$/', $latest->code, $matches)) {
+            if ($latest && preg_match('/-(\d+)$/', $latest->delivery_number, $matches)) {
                 $number = intval($matches[1]) + 1;
             } else {
                 $number = 1; // Reset ke 1 jika belum ada untuk hari ini

@@ -119,7 +119,7 @@
                                     Rp {{ number_format($price, 0, ',', '.') }}
                                 </span>
                                 <span
-                                    class="text-xs px-2 py-0.5 rounded-full 
+                                    class="text-xs px-2 py-0.5 rounded-full
                                          {{ $stock > 100 ? 'bg-green-600/20 text-green-400' : ($stock > 10 ? 'bg-amber-400/20 text-amber-300' : 'bg-red-600/20 text-red-400') }}">
                                     {{ $stock }}
                                 </span>
@@ -288,7 +288,7 @@
     @if($showPriceModal && $selectedProduct)
     <div class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition">
         <div
-            class="bg-gray-900/95 rounded-2xl shadow-2xl border border-gray-800 max-w-2xl  p-6 text-white transform transition-all duration-300 scale-100">
+            class="bg-gray-900/95 rounded-2xl shadow-2xl   border border-gray-800 max-w-3xl  p-6 text-white transform transition-all duration-300 scale-100">
 
             <!-- Header -->
             <div class="flex justify-between items-start mb-6">

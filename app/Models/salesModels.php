@@ -2,14 +2,17 @@
 
 namespace App\Models;
 
+use Log;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class salesModels extends Model
 {
-    use HasFactory, HasUuids;
+   use HasFactory, HasUuids, SoftDeletes;
 
     protected $table = 'sales_models';
 
@@ -39,7 +42,7 @@ class salesModels extends Model
 
     /**
      * Generate invoice number dengan retry logic
-     * 
+     *
      * @param string $prefix
      * @param int $maxRetries
      * @return string
@@ -58,10 +61,10 @@ class salesModels extends Model
                 $attempt++;
 
                 // Log percobaan retry
-                \Log::warning("Invoice generation retry attempt {$attempt}/{$maxRetries}", [
-                    'prefix' => $prefix,
-                    'error' => $e->getMessage()
-                ]);
+                // \Log::warning("Invoice generation retry attempt {$attempt}/{$maxRetries}", [
+                //     'prefix' => $prefix,
+                //     'error' => $e->getMessage()
+                // ]);
 
                 // Tunggu sebentar sebelum retry (exponential backoff)
                 usleep(50000 * $attempt); // 50ms, 100ms, 150ms, dst
@@ -69,17 +72,17 @@ class salesModels extends Model
         }
 
         // Jika semua retry gagal
-        \Log::error("Failed to generate invoice number after {$maxRetries} attempts", [
-            'prefix' => $prefix,
-            'last_error' => $lastException->getMessage()
-        ]);
+        // Log::error("Failed to generate invoice number after {$maxRetries} attempts", [
+        //     'prefix' => $prefix,
+        //     'last_error' => $lastException->getMessage()
+        // ]);
 
         throw new \Exception("Gagal membuat nomor invoice setelah {$maxRetries} percobaan. Silakan coba lagi.");
     }
 
     /**
      * Generate increment code untuk invoice number
-     * 
+     *
      * @param string $prefix
      * @return string
      */
@@ -134,5 +137,53 @@ class salesModels extends Model
     public function toItems()
     {
         return $this->hasMany(saleitemsModels::class, 'sale_id');
+    }
+
+     // Format nominal
+    protected function subtotalFormatted(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => 'Rp ' . number_format($this->subtotal, 0, ',', '.')
+        );
+    }
+
+    protected function totalAmountFormatted(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => 'Rp ' . number_format($this->total_amount, 0, ',', '.')
+        );
+    }
+
+    protected function discountTotalFormatted(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => 'Rp ' . number_format($this->discount_total, 0, ',', '.')
+        );
+    }
+
+    // Status badge
+    protected function statusBadge(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => match($this->status) {
+                'paid' => 'success',
+                'void' => 'danger',
+                'refund' => 'warning',
+                default => 'secondary'
+            }
+        );
+    }
+
+    // Payment method label
+    protected function paymentMethodLabel(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => match($this->payment_method) {
+                'cash' => 'Tunai',
+                'qris' => 'QRIS',
+                'bank_transfer' => 'Transfer Bank',
+                default => 'Unknown'
+            }
+        );
     }
 }

@@ -4,12 +4,13 @@ namespace App\Models;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class returModel extends Model
 {
-    use HasFactory, HasUuids;
+    use HasFactory, HasUuids, SoftDeletes;
 
     protected $table = 'returns_models';
     protected $fillable = [
@@ -44,7 +45,7 @@ class returModel extends Model
                 ->first();
 
             // Ambil nomor terakhir dari kode (setelah tanda "-")
-            if ($latest && preg_match('/-(\d+)$/', $latest->code, $matches)) {
+            if ($latest && preg_match('/-(\d+)$/', $latest->return_number, $matches)) {
                 $number = intval($matches[1]) + 1;
             } else {
                 $number = 1; // Reset ke 1 jika belum ada untuk hari ini
@@ -53,6 +54,16 @@ class returModel extends Model
             // Format hasil akhir → WH-20251017-000001
             return sprintf('%s-%s-%06d', $prefix, $today, $number);
         });
+    }
+
+    public function toSourceBranch()
+    {
+        return $this->belongsTo(cabangModel::class, 'source_branch_id');
+    }
+
+    public function toTargetBranch()
+    {
+        return $this->belongsTo(cabangModel::class, 'target_branch_id');
     }
 
     public function toSupplier()
