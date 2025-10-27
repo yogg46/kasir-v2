@@ -21,8 +21,13 @@
             <flux:navlist.group :heading="__('User Management')" class="grid">
                 <flux:navlist.item icon="home" :href="route('list-toko')" :current="request()->routeIs('list-toko')"
                     wire:navigate>{{ __('List Toko & Gudang') }}</flux:navlist.item>
-                    <flux:navlist.item icon="home" :href="route('users')" :current="request()->routeIs('users')"
+                <flux:navlist.item icon="home" :href="route('users')" :current="request()->routeIs('users')"
                     wire:navigate>{{ __('User') }}</flux:navlist.item>
+            </flux:navlist.group>
+            <flux:navlist.group :heading="__('Master Data')" class="grid">
+                <flux:navlist.item icon="home" :href="route('products.index')" :current="request()->routeIs('products')"
+                    wire:navigate>{{ __('Manajemen Produk') }}</flux:navlist.item>
+
             </flux:navlist.group>
             <flux:navlist.group :heading="__('Kasir')" class="grid">
                 <flux:navlist.item icon="home" :href="route('pos')" :current="request()->routeIs('pos')">

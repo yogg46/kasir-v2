@@ -175,6 +175,46 @@ app/
 ---
 
 ```php
+// ============================================
+// PART 4: REGISTER OBSERVERS
+// ============================================
+
+// File: app/Providers/EventServiceProvider.php
+namespace App\Providers;
+
+use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
+use App\Models\produkModel;
+use App\Models\hargaModel;
+use App\Models\batchModel;
+use App\Models\salesModels;
+use App\Models\purchaseOrdersModels;
+use App\Models\stockModels;
+use App\Models\shiftKasirModel;
+use App\Observers\ProdukObserver;
+use App\Observers\HargaObserver;
+use App\Observers\BatchObserver;
+use App\Observers\SalesObserver;
+use App\Observers\PurchaseOrderObserver;
+use App\Observers\StockObserver;
+use App\Observers\ShiftKasirObserver;
+
+class EventServiceProvider extends ServiceProvider
+{
+    /**
+     * Register any events for your application.
+     */
+    public function boot(): void
+    {
+        // Register all observers
+        produkModel::observe(ProdukObserver::class);
+        hargaModel::observe(HargaObserver::class);
+        batchModel::observe(BatchObserver::class);
+        salesModels::observe(SalesObserver::class);
+        purchaseOrdersModels::observe(PurchaseOrderObserver::class);
+        stockModels::observe(StockObserver::class);
+        shiftKasirModel::observe(ShiftKasirObserver::class);
+    }
+}
 
 // ============================================
 // PART 5: CONTOH PENGGUNAAN

@@ -84,50 +84,96 @@
 </div>
 
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{{-- <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script> --}}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const ctx = document.getElementById('salesChart');
-        if (ctx) {
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: @json($salesChart->pluck('date')),
-                    datasets: [{
-                        label: 'Total Penjualan (Rp)',
-                        data: @json($salesChart->pluck('total')),
-                        borderColor: '#3b82f6',
-                        backgroundColor: 'rgba(59,130,246,0.2)',
-                        tension: 0.4,
-                        fill: true
-                    }]
+    // document.addEventListener('DOMContentLoaded', function() {
+    //     const ctx = document.getElementById('salesChart');
+    //     if (ctx) {
+    //         new Chart(ctx, {
+    //             type: 'line',
+    //             data: {
+    //                 labels: @json($salesChart->pluck('date')),
+    //                 datasets: [{
+    //                     label: 'Total Penjualan (Rp)',
+    //                     data: @json($salesChart->pluck('total')),
+    //                     borderColor: '#3b82f6',
+    //                     backgroundColor: 'rgba(59,130,246,0.2)',
+    //                     tension: 0.4,
+    //                     fill: true
+    //                 }]
+    //             },
+    //             options: {
+    //                 responsive: true,
+    //                 maintainAspectRatio: false,
+    //                 plugins: {
+    //                     legend: {
+    //                         display: true,
+    //                         labels: { color: '#9ca3af' }
+    //                     }
+    //                 },
+    //                 scales: {
+    //                     y: {
+    //                         beginAtZero: true,
+    //                         ticks: {
+    //                             color: '#9ca3af',
+    //                             callback: (v) => 'Rp ' + v.toLocaleString('id-ID')
+    //                         },
+    //                         grid: { color: '#374151' }
+    //                     },
+    //                     x: {
+    //                         ticks: { color: '#9ca3af' },
+    //                         grid: { color: '#374151' }
+    //                     }
+    //                 }
+    //             }
+    //         });
+    //     }
+    // });
+
+    document.addEventListener('livewire:navigated', () => {
+     const ctx = document.getElementById('salesChart');
+    if (ctx) {
+        // console.log('salesChart rendering');
+
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: @json($salesChart->pluck('date')),
+                datasets: [{
+                    label: 'Total Penjualan (Rp)',
+                    data: @json($salesChart->pluck('total')),
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59,130,246,0.2)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        labels: { color: '#9ca3af' }
+                    }
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: true,
-                            labels: { color: '#9ca3af' }
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                color: '#9ca3af',
-                                callback: (v) => 'Rp ' + v.toLocaleString('id-ID')
-                            },
-                            grid: { color: '#374151' }
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            color: '#9ca3af',
+                            callback: (v) => 'Rp ' + v.toLocaleString('id-ID')
                         },
-                        x: {
-                            ticks: { color: '#9ca3af' },
-                            grid: { color: '#374151' }
-                        }
+                        grid: { color: '#374151' }
+                    },
+                    x: {
+                        ticks: { color: '#9ca3af' },
+                        grid: { color: '#374151' }
                     }
                 }
-            });
-        }
-    });
+            }
+        });
+    }
+}, { once: true });
 </script>
 @endpush

@@ -61,9 +61,31 @@ class SalesObserver
     /**
      * Handle the salesModels "deleted" event.
      */
-    public function deleted(salesModels $salesModels): void
+    public function deleting(salesModels $sale): void
     {
-        //
+        if ($sale->isForceDeleting()) {
+            // Force delete - hapus items juga
+            $sale->toItems()->forceDelete();
+        } else {
+            // Soft delete
+            if ($sale->status === 'paid' && $sale->created_at->diffInDays(now()) > 7) {
+                throw new \Exception('Tidak bisa menghapus transaksi yang sudah lebih dari 7 hari');
+            }
+
+            // Soft delete items juga (jika items punya soft delete)
+            // $sale->toItems()->delete();
+        }
+    }
+
+    public function deleted(salesModels $sale): void
+    {
+        if (!$sale->isForceDeleting()) {
+            // Revert stock jika perlu
+            // ... logic revert stock
+
+            // Log
+            // \Log::info("Sale soft deleted: {$sale->invoice_number}");
+        }
     }
 
     /**
