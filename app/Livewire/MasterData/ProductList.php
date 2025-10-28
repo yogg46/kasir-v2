@@ -7,8 +7,9 @@ use App\Models\hargaModel;
 use App\Models\cabangModel;
 use App\Models\diskonModel;
 use App\Models\produkModel;
-use Livewire\WithPagination;
+use Livewire\Attributes\On;
 // use App\Models\discountsModels as diskonModel;
+use Livewire\WithPagination;
 use App\Models\kategoriModel;
 use Livewire\WithFileUploads;
 use Illuminate\Support\Facades\DB;
@@ -136,8 +137,17 @@ class ProductList extends Component
             ->latest()
             ->paginate($this->perPage);
 
+        $archivedProducts = null;
+
+        if ($this->viewMode === 'archived') {
+            $archivedProducts = produkModel::onlyTrashed()
+                ->latest('deleted_at')
+                ->paginate($this->perPage);
+        }
+
         return view('livewire.master-data.product-list', [
-            'products' => $products
+            'products' => $products,
+            'archivedProducts' => $archivedProducts,
         ]);
     }
 
@@ -234,28 +244,188 @@ class ProductList extends Component
 
             DB::commit();
             // $this->dispatch('notify', ['message' => $message, 'type' => 'success']);
-            $this->dispatch('notify', message: $message, type: 'success');
+            // $this->dispatch('notify', message: $message, type: 'success');
+            $this->dispatch('alert', [
+                'title' => 'Berhasil!',
+                'text' => $message,
+                'icon' => 'success',
+            ]);
 
             $this->closeModal();
             $this->resetPage();
         } catch (\Exception $e) {
             DB::rollBack();
-            $this->dispatch('notify', message: 'Gagal menyimpan: ' . $e->getMessage(),  type: 'error');
+            // $this->dispatch('notify', message: 'Gagal menyimpan: ' . $e->getMessage(),  type: 'error');
+            $this->dispatch('alert', [
+                'title' => 'Gagal!',
+                'text' => 'Gagal menyimpan: ' . $e->getMessage(),
+                'icon' => 'error',
+            ]);
         }
     }
 
-    public function delete($id)
+
+    public $deleteId = null;
+
+    public function confirmDelete($id)
     {
+        $this->deleteId = $id;
+        $product = produkModel::withTrashed()->find($id);
+
+        if (!$product) {
+            $this->dispatch('alert', [
+                'title' => 'Error!',
+                'text' => 'Produk tidak ditemukan.',
+                'icon' => 'error',
+            ]);
+            return;
+        }
+
+        $this->dispatch('confirm', [
+            'title' => 'Hapus Produk?',
+            'text' => 'Yakin ingin menghapus "' . $product->name . '"?',
+            'event' => 'deleteConfirmed',
+        ]);
+    }
+
+    #[On('deleteConfirmed')]
+    public function delete()
+    {
+        if (!$this->deleteId) return;
+
         try {
-            $product = produkModel::findOrFail($id);
+            $product = produkModel::withTrashed()->find($this->deleteId);
+            if (!$product) throw new \Exception('Produk tidak ditemukan.');
+
+            if ($product->trashed()) throw new \Exception('Produk sudah dihapus.');
+
             $product->delete();
 
-            $this->dispatch('notify', message: 'Produk berhasil dihapus', type: 'success');
+            $this->dispatch('alert', [
+                'title' => 'Berhasil!',
+                'text' => 'Produk berhasil dihapus.',
+                'icon' => 'success',
+            ]);
+
             $this->resetPage();
         } catch (\Exception $e) {
-            $this->dispatch('notify', message: 'Gagal menghapus: ' . $e->getMessage(), type: 'error');
+            $this->dispatch('alert', [
+                'title' => 'Gagal!',
+                'text' => $e->getMessage(),
+                'icon' => 'error',
+            ]);
         }
     }
+
+    public function restore($id)
+    {
+        try {
+            $product = produkModel::withTrashed()->find($id);
+            if (!$product) throw new \Exception('Produk tidak ditemukan.');
+
+            $product->restore();
+
+            $this->dispatch('alert', [
+                'title' => 'Berhasil!',
+                'text' => 'Produk berhasil direstore.',
+                'icon' => 'success',
+            ]);
+        } catch (\Exception $e) {
+            $this->dispatch('alert', [
+                'title' => 'Gagal!',
+                'text' => $e->getMessage(),
+                'icon' => 'error',
+            ]);
+        }
+    }
+
+    // =========================================================
+    // FORCE DELETE PRODUK (hapus permanen)
+    // =========================================================
+
+    public function confirmForceDelete($id)
+    {
+        $this->deleteId = $id;
+        $product = produkModel::withTrashed()->find($id);
+
+        if (!$product) {
+            $this->dispatch('alert', [
+                'title' => 'Error!',
+                'text' => 'Produk tidak ditemukan.',
+                'icon' => 'error',
+            ]);
+            return;
+        }
+
+        $this->dispatch('confirm', [
+            'title' => 'Hapus Permanen?',
+            'text' => 'Produk "' . $product->name . '" akan dihapus PERMANEN dan tidak dapat dikembalikan!',
+            'icon' => 'warning',
+            'event' => 'forceDeleteConfirmed',
+        ]);
+    }
+
+    #[On('forceDeleteConfirmed')]
+    public function forceDelete()
+    {
+        if (!$this->deleteId) return;
+
+        try {
+            $product = produkModel::withTrashed()->find($this->deleteId);
+            $name = $product ? $product->name : '';
+
+            if (!$product) {
+                throw new \Exception('Produk tidak ditemukan.');
+            }
+
+            // Hapus relasi harga dan diskon dengan cara idiomatik
+            $product->toHarga()->forceDelete();
+            $product->toDiskon()->forceDelete();
+
+            // Lalu hapus produk secara permanen
+            $product->forceDelete();
+
+
+            $this->dispatch('alert', [
+                'title' => 'Berhasil!',
+                'text' => 'Produk "' . $name . '" telah dihapus permanen.',
+                'icon' => 'success',
+            ]);
+
+            $this->resetPage();
+        } catch (\Exception $e) {
+            $this->dispatch('alert', [
+                'title' => 'Gagal!',
+                'text' => 'Gagal menghapus permanen: ' . $e->getMessage(),
+                'icon' => 'error',
+            ]);
+        }
+    }
+
+
+    public $viewMode = 'active'; // default tab
+    // public $archivedProducts;
+
+    public function getProductsProperty()
+    {
+        return produkModel::with(['toKategori', 'toHarga', 'toStocks'])
+            ->when($this->viewMode === 'active', fn($q) => $q->whereNull('deleted_at'))
+            ->when($this->viewMode === 'archived', fn($q) => $q->onlyTrashed())
+            ->latest()
+            ->paginate($this->perPage);
+    }
+
+    public function getArchivedProductsProperty()
+    {
+        return produkModel::onlyTrashed()
+            ->with('toKategori')
+            ->latest('deleted_at')
+            ->paginate($this->perPage);
+    }
+
+
+
+
 
     // ==========================================
     // PRICE MANAGEMENT
@@ -274,12 +444,22 @@ class ProductList extends Component
         // Tambahkan manual validasi khusus:
         if ($this->newPrice['branch_id'] !== 'all' && !is_numeric($this->newPrice['branch_id'])) {
             // $this->addError('newPrice.branch_id', 'Cabang tidak valid.');
-            $this->dispatch('notify', message: 'Cabang tidak valid.', type: 'error');
+            // $this->dispatch('notify', message: 'Cabang tidak valid.', type: 'error');
+            $this->dispatch('alert', [
+                'title' => 'Gagal!',
+                'text' => 'Cabang tidak valid.',
+                'icon' => 'error',
+            ]);
             return;
         }
 
         if ($this->newPrice['purchase_price'] && $this->newPrice['price'] < $this->newPrice['purchase_price']) {
-            $this->dispatch('notify', message: 'Harga jual tidak boleh lebih kecil dari harga beli', type: 'error');
+            // $this->dispatch('notify', message: 'Harga jual tidak boleh lebih kecil dari harga beli', type: 'error');
+            $this->dispatch('alert', [
+                'title' => 'Gagal!',
+                'text' => 'Harga jual tidak boleh lebih kecil dari harga beli.',
+                'icon' => 'error',
+            ]);
             return;
         }
 
@@ -321,7 +501,12 @@ class ProductList extends Component
                 // Refresh daftar harga
                 $this->loadPrices($this->productId);
 
-                $this->dispatch('notify', message: 'Harga berhasil ditambahkan', type: 'success');
+                // $this->dispatch('notify', message: 'Harga berhasil ditambahkan', type: 'success');
+                $this->dispatch('alert', [
+                    'title' => 'Berhasil!',
+                    'text' => 'Harga berhasil ditambahkan.',
+                    'icon' => 'success',
+                ]);
             }
             // Jika produk belum tersimpan (mode tambah produk)
             else {
@@ -361,7 +546,12 @@ class ProductList extends Component
 
             $this->resetNewPrice();
         } catch (\Exception $e) {
-            $this->dispatch('notify', message: 'Gagal menambah harga: ' . $e->getMessage(), type: 'error');
+            // $this->dispatch('notify', message: 'Gagal menambah harga: ' . $e->getMessage(), type: 'error');
+            $this->dispatch('alert', [
+                'title' => 'Gagal!',
+                'text' => 'Gagal menambah harga: ' . $e->getMessage(),
+                'icon' => 'error',
+            ]);
         }
     }
 
@@ -369,10 +559,20 @@ class ProductList extends Component
     {
         if ($id && !str_starts_with($id, 'temp_')) {
             try {
-                hargaModel::findOrFail($id)->delete();
-                $this->dispatch('notify', message: 'Harga berhasil dihapus', type: 'success');
+                hargaModel::withTrashed()->findOrFail($id)->forceDelete();
+                // $this->dispatch('notify', message: 'Harga berhasil dihapus', type: 'success');
+                $this->dispatch('alert', [
+                    'title' => 'Berhasil!',
+                    'text' => 'Harga berhasil dihapus.',
+                    'icon' => 'success',
+                ]);
             } catch (\Exception $e) {
-                $this->dispatch('notify', message: 'Gagal menghapus harga: ' . $e->getMessage(), type: 'error');
+                // $this->dispatch('notify', message: 'Gagal menghapus harga: ' . $e->getMessage(), type: 'error');
+                $this->dispatch('alert', [
+                    'title' => 'Gagal!',
+                    'text' => 'Gagal menghapus harga: ' . $e->getMessage(),
+                    'icon' => 'error',
+                ]);
                 return;
             }
         }
@@ -394,9 +594,19 @@ class ProductList extends Component
 
                 $price->update(['is_default' => true]);
                 $this->loadPrices($this->productId);
-                $this->dispatch('notify', message: 'Harga default berhasil diubah', type: 'success');
+                // $this->dispatch('notify', message: 'Harga default berhasil diubah', type: 'success');
+                $this->dispatch('alert', [
+                    'title' => 'Berhasil!',
+                    'text' => 'Harga default berhasil diubah.',
+                    'icon' => 'success',
+                ]);
             } catch (\Exception $e) {
-                $this->dispatch('notify', message: 'Gagal mengubah default: ' . $e->getMessage(), type: 'error');
+                // $this->dispatch('notify', message: 'Gagal mengubah default: ' . $e->getMessage(), type: 'error');
+                $this->dispatch('alert', [
+                    'title' => 'Gagal!',
+                    'text' => 'Gagal mengubah default: ' . $e->getMessage(),
+                    'icon' => 'error',
+                ]);
             }
         } else {
             // Update array sementara
@@ -414,32 +624,62 @@ class ProductList extends Component
 
     public function addDiscount()
     {
+        // dd($this->newDiscount['notes']);
         $this->validate([
             'newDiscount.type' => 'required|in:item,transaction',
             'newDiscount.discount_percent' => 'nullable|numeric|min:0|max:100',
             'newDiscount.discount_amount' => 'nullable|numeric|min:0',
+            'newDiscount.valid_from' => 'nullable|date',
+            'newDiscount.valid_until' => 'nullable|date|after_or_equal:newDiscount.valid_from',
         ]);
 
         if (!$this->newDiscount['discount_percent'] && !$this->newDiscount['discount_amount']) {
-            $this->dispatch('notify',  message: 'Isi salah satu: persen atau nominal', type: 'error');
+            $this->dispatch('alert', [
+                'title' => 'Gagal!',
+                'text' => 'Isi salah satu: persen atau nominal.',
+                'icon' => 'error',
+            ]);
             return;
         }
 
         try {
             if ($this->productId) {
-                diskonModel::create([
-                    'product_id' => $this->productId,
-                    'branch_id' => $this->newDiscount['branch_id'],
-                    'type' => $this->newDiscount['type'],
-                    'discount_percent' => $this->newDiscount['discount_percent'],
-                    'discount_amount' => $this->newDiscount['discount_amount'],
-                    'valid_from' => $this->newDiscount['valid_from'],
-                    'valid_until' => $this->newDiscount['valid_until'],
-                    'notes' => $this->newDiscount['notes'],
-                ]);
+                if ($this->newDiscount['branch_id'] === 'all') {
+                    foreach ($this->branches as $branch) {
+                        diskonModel::create([
+                            'product_id' => $this->productId,
+                            'branch_id' => $branch->id,
+                            'type' => $this->newDiscount['type'],
+                            'discount_percent' => $this->newDiscount['discount_percent'],
+                            'discount_amount' => $this->newDiscount['discount_amount'],
+                            'valid_from' => $this->newDiscount['valid_from'],
+                            'valid_until' => $this->newDiscount['valid_until'],
+                            'notes' => $this->newDiscount['notes'],
+                        ]);
+                    }
+
+                    $message = 'Diskon berhasil ditambahkan di semua cabang.';
+                } else {
+                    diskonModel::create([
+                        'product_id' => $this->productId,
+                        'branch_id' => $this->newDiscount['branch_id'],
+                        'type' => $this->newDiscount['type'],
+                        'discount_percent' => $this->newDiscount['discount_percent'],
+                        'discount_amount' => $this->newDiscount['discount_amount'],
+                        'valid_from' => $this->newDiscount['valid_from'],
+                        'valid_until' => $this->newDiscount['valid_until'],
+                        'notes' => $this->newDiscount['notes'],
+                    ]);
+
+                    $message = 'Diskon berhasil ditambahkan di cabang terpilih.';
+                }
 
                 $this->loadDiscounts($this->productId);
-                $this->dispatch('notify', message: 'Diskon berhasil ditambahkan', type: 'success');
+                $this->dispatch('alert', [
+                    'title' => 'Berhasil!',
+                    'text' => $message,
+                    'icon' => 'success',
+                ]);
             } else {
                 // Tambah ke array sementara
                 $branch = $this->branches->find($this->newDiscount['branch_id']);
@@ -451,7 +691,11 @@ class ProductList extends Component
 
             $this->resetNewDiscount();
         } catch (\Exception $e) {
-            $this->dispatch('notify', message: 'Gagal menambah diskon: ' . $e->getMessage(), type: 'error');
+            $this->dispatch('alert', [
+                'title' => 'Gagal!',
+                'text' => 'Gagal menambah diskon: ' . $e->getMessage(),
+                'icon' => 'error',
+            ]);
         }
     }
 
@@ -459,10 +703,18 @@ class ProductList extends Component
     {
         if ($id && !str_starts_with($id, 'temp_')) {
             try {
-                diskonModel::findOrFail($id)->delete();
-                $this->dispatch('notify', message: 'Diskon berhasil dihapus', type: 'success');
+                diskonModel::withTrashed()->findOrFail($id)->forceDelete();
+                $this->dispatch('alert', [
+                    'title' => 'Berhasil!',
+                    'text' => 'Diskon berhasil dihapus.',
+                    'icon' => 'success',
+                ]);
             } catch (\Exception $e) {
-                $this->dispatch('notify',  message: 'Gagal menghapus diskon: ' . $e->getMessage(), type: 'error');
+                $this->dispatch('alert', [
+                    'title' => 'Gagal!',
+                    'text' => $e->getMessage(),
+                    'icon' => 'error',
+                ]);
                 return;
             }
         }
@@ -523,6 +775,34 @@ class ProductList extends Component
         return round((($price - $purchasePrice) / $purchasePrice) * 100, 2);
     }
 
+    // =========================================================
+    // UTILITIES
+    // =========================================================
+
+    private function resetNewPrice()
+    {
+        $this->newPrice = [
+            'branch_id' => null,
+            'unit_name' => '',
+            'price' => 0,
+            'purchase_price' => 0,
+            'is_default' => false,
+        ];
+    }
+
+    private function resetNewDiscount()
+    {
+        $this->newDiscount = [
+            'branch_id' => 'all',
+            'type' => '',
+            'discount_percent' => null,
+            'discount_amount' => null,
+            'valid_from' => null,
+            'valid_until' => null,
+            'notes' => '',
+        ];
+    }
+
     public function resetForm()
     {
         $this->reset([
@@ -535,38 +815,10 @@ class ProductList extends Component
             'notes',
             'is_active',
             'prices',
-            'discounts'
+            'discounts',
         ]);
         $this->resetNewPrice();
         $this->resetNewDiscount();
-    }
-
-    private function resetNewPrice()
-    {
-        $this->newPrice = [
-            'branch_id' => null,
-            'unit_name' => '',
-            'unit_qty' => 1,
-            'price' => 0,
-            'purchase_price' => 0,
-            'is_default' => false,
-            'valid_from' => null,
-            'valid_until' => null,
-            'notes' => ''
-        ];
-    }
-
-    private function resetNewDiscount()
-    {
-        $this->newDiscount = [
-            'branch_id' => null,
-            'type' => 'item',
-            'discount_percent' => null,
-            'discount_amount' => null,
-            'valid_from' => null,
-            'valid_until' => null,
-            'notes' => ''
-        ];
     }
 
     public function closeModal()
@@ -579,13 +831,15 @@ class ProductList extends Component
     {
         $this->resetPage();
     }
-
     public function updatingFilterCategory()
     {
         $this->resetPage();
     }
-
     public function updatingFilterType()
+    {
+        $this->resetPage();
+    }
+    public function updatingShowTrashed()
     {
         $this->resetPage();
     }

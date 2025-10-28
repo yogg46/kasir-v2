@@ -74,7 +74,23 @@
         </div>
 
         <!-- Table -->
+        {{-- === Header Tabs === --}}
+        <div class="flex space-x-2  border-b border-gray-700">
+            <button wire:click="toggleTrashed" class="px-4 py-2 font-medium text-sm rounded-t-lg transition
+            {{ !$showTrashed   
+                ? 'bg-blue-600 text-white' 
+                : 'bg-gray-800 text-gray-400 hover:text-gray-200' }}">
+                🔹 Data Aktif
+            </button>
+            <button  wire:click="toggleTrashed" class="px-4 py-2 font-medium text-sm rounded-t-lg transition
+            {{ $showTrashed   
+                ? 'bg-red-600 text-white' 
+                : 'bg-gray-800 text-gray-400 hover:text-gray-200' }}">
+                🗃️ Arsip
+            </button>
+        </div>
         <div class="bg-gray-900 rounded-xl p-4">
+          
             <table class="w-full text-sm">
                 <thead>
                     <tr class="text-gray-400 border-b border-gray-700">
@@ -95,11 +111,19 @@
                         <td class="py-2 text-teal-400">{{ $u->toRole?->role ?? '-' }}</td>
                         <td class="py-2 text-gray-400">{{ $u->toCabang?->name ?? '-' }}</td>
                         <td class="py-2 flex gap-2">
+                            @if ($showTrashed)
+                            <button wire:click="restore('{{ $u->id }}')"
+                                class="bg-green-600 hover:bg-green-700 px-3 py-1 rounded-lg text-xs">Pulihkan</button>
+                            <button wire:click="confirmForceDelete('{{ $u->id }}')"
+                                class="bg-red-600 hover:bg-red-700 px-3 py-1 rounded-lg text-xs">Hapus Permanen</button>
+                            @else
                             <button wire:click="edit('{{ $u->id }}')"
                                 class="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded-lg text-xs">Edit</button>
-                            <button wire:click="delete('{{ $u->id }}')"
+                            <button wire:click="confirmDelete('{{ $u->id }}')"
                                 class="bg-red-600 hover:bg-red-700 px-3 py-1 rounded-lg text-xs">Hapus</button>
+                            @endif
                         </td>
+
                     </tr>
                     @empty
                     <tr>

@@ -25,6 +25,11 @@ class shiftKasirModel extends Model
         'status'
     ];
 
+    protected $casts = [
+        'shift_start' => 'datetime',
+        'shift_end' => 'datetime',
+    ];
+
     public function toKasir()
     {
         return $this->belongsTo(User::class, 'cashier_id');

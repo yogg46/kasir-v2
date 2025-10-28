@@ -2,6 +2,7 @@
 
 use App\Livewire\Sales\POS;
 use Laravel\Fortify\Features;
+use App\Livewire\Sales\ShiftKasir;
 use App\Livewire\Settings\Profile;
 use App\Livewire\Settings\Password;
 use App\Livewire\Settings\TwoFactor;
@@ -9,9 +10,9 @@ use App\Livewire\Dashboard\Dashboard;
 use App\Livewire\Settings\Appearance;
 use Illuminate\Support\Facades\Route;
 use App\Livewire\MasterData\CabangToko;
-use App\Livewire\MasterData\ProductList;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Request;
+use App\Livewire\MasterData\ProductList;
 use App\Livewire\MasterData\UserManagement;
 
 Route::get('/', function () {
@@ -32,7 +33,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('pos',POS::class)->name('pos');
     Route::get('list-toko',CabangToko::class)->name('list-toko');
     Route::get('users',UserManagement::class)->name('users');
-    Route::get('/products', ProductList::class)->name('products.index');
+    Route::get('products', ProductList::class)->name('products.index');
+    Route::get('shift-kasir', ShiftKasir::class)->name('shift-kasir');
 
 
 });

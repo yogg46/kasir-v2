@@ -1,0 +1,1434 @@
+
+
+=== FILE: D:\laragon\www\kasir-v2\database\migrations\0000_10_15_040546_create_branches_models_table.php ===
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('branches_models', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->string('code')->unique();
+            $table->string('name');
+            $table->string('address')->nullable();
+            $table->string('phone')->nullable();
+            $table->boolean('is_head_office')->default(false);
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('branches_models');
+    }
+};
+
+
+=== FILE: D:\laragon\www\kasir-v2\database\migrations\0000_10_16_033449_create_role_models_table.php ===
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('role_models', function (Blueprint $table) {
+            $table->id();
+            $table->string('role');
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('role_models');
+    }
+};
+
+
+=== FILE: D:\laragon\www\kasir-v2\database\migrations\0001_01_01_000000_create_users_table.php ===
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('users', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->foreignId('role_id')->constrained('role_models')->onDelete('restrict'); // FK ke roles
+            $table->foreignUuid('branch_id')->nullable()->constrained('branches_models')->onDelete('set null'); // opsional jika user terikat cabang
+
+            $table->string('name');
+            // $table->string('email')->unique();
+            $table->string('username')->unique();
+
+            $table->string('appearance')->default('system');
+            // $table->timestamp('email_verified_at')->nullable();
+            $table->string('password');
+            $table->rememberToken();
+            $table->timestamps();
+        });
+
+        Schema::create('password_reset_tokens', function (Blueprint $table) {
+            $table->string('email')->primary();
+            $table->string('token');
+            $table->timestamp('created_at')->nullable();
+        });
+
+        Schema::create('sessions', function (Blueprint $table) {
+            $table->string('id')->primary();
+            $table->foreignUuid('user_id')->nullable()->index()->constrained('users')->onDelete('set null');
+            $table->string('ip_address', 45)->nullable();
+            $table->text('user_agent')->nullable();
+            $table->longText('payload');
+            $table->integer('last_activity')->index();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('users');
+        Schema::dropIfExists('password_reset_tokens');
+        Schema::dropIfExists('sessions');
+    }
+};
+
+
+=== FILE: D:\laragon\www\kasir-v2\database\migrations\0001_01_01_000001_create_cache_table.php ===
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('cache', function (Blueprint $table) {
+            $table->string('key')->primary();
+            $table->mediumText('value');
+            $table->integer('expiration');
+        });
+
+        Schema::create('cache_locks', function (Blueprint $table) {
+            $table->string('key')->primary();
+            $table->string('owner');
+            $table->integer('expiration');
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('cache');
+        Schema::dropIfExists('cache_locks');
+    }
+};
+
+
+=== FILE: D:\laragon\www\kasir-v2\database\migrations\0001_01_01_000002_create_jobs_table.php ===
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('jobs', function (Blueprint $table) {
+            $table->id();
+            $table->string('queue')->index();
+            $table->longText('payload');
+            $table->unsignedTinyInteger('attempts');
+            $table->unsignedInteger('reserved_at')->nullable();
+            $table->unsignedInteger('available_at');
+            $table->unsignedInteger('created_at');
+        });
+
+        Schema::create('job_batches', function (Blueprint $table) {
+            $table->string('id')->primary();
+            $table->string('name');
+            $table->integer('total_jobs');
+            $table->integer('pending_jobs');
+            $table->integer('failed_jobs');
+            $table->longText('failed_job_ids');
+            $table->mediumText('options')->nullable();
+            $table->integer('cancelled_at')->nullable();
+            $table->integer('created_at');
+            $table->integer('finished_at')->nullable();
+        });
+
+        Schema::create('failed_jobs', function (Blueprint $table) {
+            $table->id();
+            $table->string('uuid')->unique();
+            $table->text('connection');
+            $table->text('queue');
+            $table->longText('payload');
+            $table->longText('exception');
+            $table->timestamp('failed_at')->useCurrent();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('jobs');
+        Schema::dropIfExists('job_batches');
+        Schema::dropIfExists('failed_jobs');
+    }
+};
+
+
+=== FILE: D:\laragon\www\kasir-v2\database\migrations\2025_09_02_075243_add_two_factor_columns_to_users_table.php ===
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::table('users', function (Blueprint $table) {
+            $table->text('two_factor_secret')->after('password')->nullable();
+            $table->text('two_factor_recovery_codes')->after('two_factor_secret')->nullable();
+            $table->timestamp('two_factor_confirmed_at')->after('two_factor_recovery_codes')->nullable();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::table('users', function (Blueprint $table) {
+            $table->dropColumn([
+                'two_factor_secret',
+                'two_factor_recovery_codes',
+                'two_factor_confirmed_at',
+            ]);
+        });
+    }
+};
+
+
+=== FILE: D:\laragon\www\kasir-v2\database\migrations\2025_10_15_043307_create_warehoses_models_table.php ===
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('warehoses_models', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->foreignUuid('branch_id')->constrained('branches_models')->onDelete('cascade'); // FK ke branches_models
+            $table->string('code')->unique();
+            $table->string('name');
+            $table->string('address')->nullable();
+            $table->boolean('is_main')->default(false);
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('warehoses_models');
+    }
+};
+
+
+=== FILE: D:\laragon\www\kasir-v2\database\migrations\2025_10_15_061147_create_categories_models_table.php ===
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('categories_models', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->string('name');
+            $table->text('description')->nullable();
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('categories_models');
+    }
+};
+
+
+=== FILE: D:\laragon\www\kasir-v2\database\migrations\2025_10_15_061207_create_supliers_models_table.php ===
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('supliers_models', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->string('code')->unique();
+            $table->string('name');
+            $table->string('address')->nullable();
+            $table->string('phone')->nullable();
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('supliers_models');
+    }
+};
+
+
+=== FILE: D:\laragon\www\kasir-v2\database\migrations\2025_10_15_061220_create_products_models_table.php ===
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('products_models', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->foreignUuid('category_id')->constrained('categories_models')->onDelete('cascade'); // FK ke categories_models
+            // $table->foreignUuid('suplier_id')->nullable()->constrained('supliers_models')->onDelete('set null'); // opsional jika produk tidak memiliki suplier
+            $table->string('code')->unique();
+            $table->string('name');
+            $table->text('description')->nullable();
+            $table->string('barcode')->unique()->nullable();
+            $table->enum('type',['umkm','regular','seasonal'])->default('regular');
+            $table->string('notes')->nullable();
+            $table->boolean('is_active')->default(true);
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('products_models');
+    }
+};
+
+
+=== FILE: D:\laragon\www\kasir-v2\database\migrations\2025_10_15_062612_create_prices_models_table.php ===
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('prices_models', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->foreignUuid('product_id')->constrained('products_models')->onDelete('cascade'); // FK ke products_models
+            $table->foreignUuid('branch_id')->nullable()->constrained('branches_models')->onDelete('set null'); // FK ke branches_models
+            $table->string('unit_name'); // nama satuan, misal 'pcs', 'box', dll
+            $table->integer('unit_qty')->default(1); // jumlah unit dalam satuan ini
+            $table->decimal('price', 15, 2); // harga dalam satuan
+            $table->decimal('old_price', 15, 2)->nullable(); // harga lama opsional
+            $table->decimal('purchase_price', 15, 2)->nullable(); // harga beli opsional
+            $table->boolean('is_default')->default(false); // apakah ini harga default untuk produk di cabang ini
+            $table->date('valid_from')->nullable(); // tanggal mulai berlaku
+            $table->date('valid_until')->nullable(); // tanggal berakhir berlaku
+            $table->string('notes')->nullable();
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('prices_models');
+    }
+};
+
+
+=== FILE: D:\laragon\www\kasir-v2\database\migrations\2025_10_15_062622_create_discounts_models_table.php ===
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('discounts_models', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->foreignUuid('price_id')->nullable()->constrained('prices_models')->onDelete('set null'); // FK ke prices_models
+            $table->foreignUuid('branch_id')->nullable()->constrained('branches_models')->onDelete('set null'); // FK ke branches_models
+            $table->foreignUuid('product_id')->nullable()->constrained('products_models')->onDelete('set null'); // FK ke products_models
+            $table->enum('type',['item','transaction'])->default('item');
+            $table->decimal('discount_percent',5,2)->nullable(); // diskon dalam persen
+            $table->decimal('discount_amount',15,2)->nullable(); // diskon dalam nominal
+            $table->date('valid_from')->nullable(); // tanggal mulai berlaku
+            $table->date('valid_until')->nullable(); // tanggal berakhir berlaku
+            $table->string('notes')->nullable();
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('discounts_models');
+    }
+};
+
+
+=== FILE: D:\laragon\www\kasir-v2\database\migrations\2025_10_15_074051_create_stock_models_table.php ===
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('stock_models', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->foreignUuid('product_id')->constrained('products_models')->onDelete('cascade'); // FK ke products_models
+            $table->foreignUuid('warehouse_id')->nullable()->constrained('warehoses_models')->onDelete('cascade'); // FK ke warehoses_models
+            // $table->foreignUuid('branch_id')->nullable()->constrained('branches_models')->onDelete('cascade'); // FK ke branches_models
+            $table->integer('quantity')->default(0);
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('stock_models');
+    }
+};
+
+
+=== FILE: D:\laragon\www\kasir-v2\database\migrations\2025_10_15_074104_create_batches_models_table.php ===
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('batches_models', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->foreignUuid('product_id')->constrained('products_models')->onDelete('cascade'); // FK ke products_models
+            $table->foreignUuid('warehouse_id')->nullable()->constrained('warehoses_models')->onDelete('cascade'); // FK ke warehoses_models
+            $table->string('code')->unique();
+            $table->date('expiry_date')->nullable();
+            $table->integer('quantity')->default(0);
+
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('batches_models');
+    }
+};
+
+
+=== FILE: D:\laragon\www\kasir-v2\database\migrations\2025_10_15_074126_create_purchase_orders_models_table.php ===
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('purchase_orders_models', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->foreignUuid('suplier_id')->constrained('supliers_models')->onDelete('cascade'); // FK ke supliers_models
+            $table->foreignUuid('warehouse_id')->constrained('warehoses_models')->onDelete('cascade'); // FK ke warehoses_models
+            $table->string('order_number')->unique();
+            $table->date('order_date');
+             $table->decimal('total', 15, 2)->default(0);
+            $table->enum('status',['draf','approved','received','cancelled'])->default('draf');
+            $table->text('notes')->nullable();
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('purchase_orders_models');
+    }
+};
+
+
+=== FILE: D:\laragon\www\kasir-v2\database\migrations\2025_10_15_074138_create_purchase_order_items_models_table.php ===
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('purchase_order_items_models', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->foreignUuid('purchase_order_id')->constrained('purchase_orders_models')->onDelete('cascade'); // FK ke purchase_orders_models
+            $table->foreignUuid('product_id')->constrained('products_models')->onDelete('cascade'); // FK ke products_models
+            $table->integer('quantity')->default(0);
+            $table->decimal('price',15,2)->default(0);
+            $table->decimal('subtotal',15,2)->default(0);
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('purchase_order_items_models');
+    }
+};
+
+
+=== FILE: D:\laragon\www\kasir-v2\database\migrations\2025_10_15_074159_create_goods_receipts_models_table.php ===
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('goods_receipts_models', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->foreignUuid('purchase_order_id')->constrained('purchase_orders_models')->onDelete('cascade'); // FK ke purchase_orders_models
+            $table->foreignUuid('warehouse_id')->constrained('warehoses_models')->onDelete('cascade'); // FK ke warehoses_models
+            $table->string('receipt_number')->unique();
+            $table->date('receipt_date');
+            $table->string('received_by')->nullable();
+            $table->enum('status',['pending','completed','cancelled'])->default('pending');
+            $table->decimal('total',15,2)->default(0);
+            $table->text('notes')->nullable();
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('goods_receipts_models');
+    }
+};
+
+
+=== FILE: D:\laragon\www\kasir-v2\database\migrations\2025_10_15_074318_create_goods_receipt_items_models_table.php ===
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('goods_receipt_items_models', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->foreignUuid('goods_receipt_id')->constrained('goods_receipts_models')->onDelete('cascade'); // FK ke goods_receipts_models
+            $table->foreignUuid('product_id')->constrained('products_models')->onDelete('cascade'); // FK ke products_models
+            $table->foreignUuid('batch_id')->nullable()->constrained('batches_models')->onDelete('set null'); // opsional, FK ke batches_models
+            $table->integer('quantity')->default(0);
+            $table->decimal('price',15,2)->default(0);
+            $table->decimal('subtotal',15,2)->default(0);
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('goods_receipt_items_models');
+    }
+};
+
+
+=== FILE: D:\laragon\www\kasir-v2\database\migrations\2025_10_15_074345_create_returns_models_table.php ===
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('returns_models', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->foreignUuid('source_branch_id')->nullable()->constrained('branches_models')->onDelete('cascade'); // FK ke branches_models
+            $table->foreignUuid('target_branch_id')->nullable()->constrained('branches_models')->onDelete('cascade'); // FK ke branches_models
+            $table->foreignUuid('suplier_id')->nullable()->constrained('supliers_models')->onDelete('set null'); // opsional, FK ke supliers_models
+           
+            $table->string('return_number')->unique();
+            $table->enum('type', ['customer_to_branch', 'branch_to_head', 'head_to_supplier']);
+            $table->text('notes')->nullable();
+            $table->date('return_date');
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('returns_models');
+    }
+};
+
+
+=== FILE: D:\laragon\www\kasir-v2\database\migrations\2025_10_15_074404_create_delivery_orders_models_table.php ===
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('delivery_orders_models', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->foreignUuid('warehose_from')->constrained('warehoses_models')->onDelete('cascade'); // FK ke warehoses_models
+            $table->foreignUuid('warehose_to')->constrained('warehoses_models')->onDelete('cascade'); // FK ke warehoses_models
+            $table->string('delivery_number')->unique();
+            $table->date('delivery_date');
+            $table->enum('status',['draf','in_transit','delivered','cancelled'])->default('draf');
+            $table->text('notes')->nullable();
+            
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('delivery_orders_models');
+    }
+};
+
+
+=== FILE: D:\laragon\www\kasir-v2\database\migrations\2025_10_15_074410_create_delivery_order_items_models_table.php ===
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('delivery_order_items_models', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->foreignUuid('delivery_order_id')->constrained('delivery_orders_models')->onDelete('cascade'); // FK ke delivery_orders_models
+            $table->foreignUuid('product_id')->constrained('products_models')->onDelete('cascade'); // FK ke products_models
+            $table->integer('quantity')->default(0);
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('delivery_order_items_models');
+    }
+};
+
+
+=== FILE: D:\laragon\www\kasir-v2\database\migrations\2025_10_15_074440_create_sales_models_table.php ===
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('sales_models', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->foreignUuid('branch_id')->constrained('branches_models')->onDelete('cascade'); // FK ke branches_models
+            $table->foreignUuid('cashier_id')->constrained('users')->onDelete('cascade'); // FK ke users_models
+            $table->date('sale_date');
+            $table->string('invoice_number')->unique();
+            $table->decimal('subtotal',15,2)->default(0);
+            $table->decimal('total_amount',15,2)->default(0);
+            $table->decimal('discount_total',15,2)->default(0);
+            $table->enum('payment_method',['cash','qris','bank_transfer'])->default('cash');
+            $table->enum('status',['paid','void','refund'])->default('paid');
+            $table->string('notes')->nullable();
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('sales_models');
+    }
+};
+
+
+=== FILE: D:\laragon\www\kasir-v2\database\migrations\2025_10_15_074450_create_saleitems_models_table.php ===
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('saleitems_models', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->foreignUuid('sale_id')->constrained('sales_models')->onDelete('cascade'); // FK ke sales_models
+            $table->foreignUuid('product_id')->constrained('products_models')->onDelete('cascade'); // FK ke products_models
+            $table->string('unit_name')->nullable();
+            $table->integer('quantity')->default(0);
+
+            $table->decimal('price',15,2)->default(0);
+            $table->decimal('discount',15,2)->default(0);
+            $table->decimal('subtotal',15,2)->default(0);
+
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('saleitems_models');
+    }
+};
+
+
+=== FILE: D:\laragon\www\kasir-v2\database\migrations\2025_10_15_074522_create_cashier_shifts_models_table.php ===
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('cashier_shifts_models', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->foreignUuid('cashier_id')->constrained('users')->onDelete('cascade'); // FK ke users_models
+            $table->foreignUuid('branch_id')->constrained('branches_models')->onDelete('cascade'); // FK ke branches_models
+            $table->dateTime('shift_start');
+            $table->dateTime('shift_end')->nullable();
+            $table->decimal('initial_cash',15,2)->default(0);
+            $table->decimal('cash_in',15,2)->default(0);
+            $table->decimal('cash_out',15,2)->default(0);
+            $table->decimal('final_cash',15,2)->default(0);
+            $table->enum('status',['open','closed'])->default('open');
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('cashier_shifts_models');
+    }
+};
+
+
+=== FILE: D:\laragon\www\kasir-v2\database\migrations\2025_10_16_033401_create_notifications_models_table.php ===
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('notifications_models', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->foreignUuid('user_id')->nullable()->constrained('users')->onDelete('set null'); // opsional, FK ke users
+            $table->foreignUuid('branch_id')->nullable()->constrained('branches_models')->onDelete('set null'); // opsional, FK ke branches_models
+            $table->string('title');
+            $table->text('message')->nullable();
+            $table->string('type')->nullable(); // e.g., info, warning, error
+            $table->json('meta_data')->nullable(); // old_price, new_price, product_id, etc
+            $table->boolean('is_read')->default(false);
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('notifications_models');
+    }
+};
+
+
+=== FILE: D:\laragon\www\kasir-v2\database\migrations\2025_10_16_080843_create_return_items_models_table.php ===
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('return_items_models', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->foreignUuid('return_id')->constrained('returns_models')->onDelete('cascade'); // FK ke returns_models
+            $table->foreignUuid('product_id')->constrained('products_models')->onDelete('cascade'); // FK ke products_models
+             $table->foreignUuid('batch_id')->nullable()->constrained('batches_models')->onDelete('set null'); // opsional, FK ke batches_models
+            $table->integer('quantity')->default(0);
+            $table->decimal('price',15,2)->default(0);
+            $table->decimal('subtotal',15,2)->default(0);
+            $table->string('reason')->nullable();
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('return_items_models');
+    }
+};
+
+
+=== FILE: D:\laragon\www\kasir-v2\database\migrations\2025_10_24_064152_add_indexes_for_performance.php ===
+
+<?php
+
+// ============================================
+// PART 1: MIGRATION - TAMBAH INDEX
+// ============================================
+// File: database/migrations/xxxx_add_indexes_for_performance.php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        // Products - sering dicari by code, barcode, category
+        Schema::table('products_models', function (Blueprint $table) {
+            $table->index('category_id');
+            $table->index('is_active');
+            $table->index(['category_id', 'is_active']); // composite untuk filter aktif per kategori
+        });
+
+        // Stock - sering query by product & warehouse
+        Schema::table('stock_models', function (Blueprint $table) {
+            $table->index('product_id');
+            $table->index('warehouse_id');
+            $table->index(['product_id', 'warehouse_id']); // composite untuk cek stok produk di gudang
+        });
+
+        // Batches - query by expiry, product, warehouse
+        Schema::table('batches_models', function (Blueprint $table) {
+            $table->index('product_id');
+            $table->index('warehouse_id');
+            $table->index('expiry_date'); // untuk cek expired
+            $table->index(['expiry_date', 'warehouse_id']); // cek expired per gudang
+        });
+
+        // Prices - query by product, branch, validity
+        Schema::table('prices_models', function (Blueprint $table) {
+            $table->index('product_id');
+            $table->index('branch_id');
+            $table->index('is_default');
+            $table->index(['product_id', 'branch_id', 'is_default']); // get default price per branch
+            $table->index(['valid_from', 'valid_until']); // cek harga aktif
+        });
+
+        // Discounts - query by validity, type
+        Schema::table('discounts_models', function (Blueprint $table) {
+            $table->index('product_id');
+            $table->index('branch_id');
+            $table->index('type');
+            $table->index(['valid_from', 'valid_until']); // cek diskon aktif
+            $table->index(['product_id', 'branch_id', 'type']); // get diskon spesifik
+        });
+
+        // Sales - query by date, branch, cashier, status
+        Schema::table('sales_models', function (Blueprint $table) {
+            $table->index('branch_id');
+            $table->index('cashier_id');
+            $table->index('sale_date');
+            $table->index('status');
+            $table->index(['branch_id', 'sale_date']); // laporan per cabang per tanggal
+            $table->index(['cashier_id', 'sale_date']); // laporan per kasir
+        });
+
+        // Purchase Orders - query by supplier, warehouse, date, status
+        Schema::table('purchase_orders_models', function (Blueprint $table) {
+            $table->index('suplier_id');
+            $table->index('warehouse_id');
+            $table->index('order_date');
+            $table->index('status');
+            $table->index(['status', 'order_date']); // filter PO by status & date
+        });
+
+        // Goods Receipts - query by PO, warehouse, date, status
+        Schema::table('goods_receipts_models', function (Blueprint $table) {
+            $table->index('purchase_order_id');
+            $table->index('warehouse_id');
+            $table->index('receipt_date');
+            $table->index('status');
+        });
+
+        // Returns - query by branches, supplier, date, type
+        Schema::table('returns_models', function (Blueprint $table) {
+            $table->index('source_branch_id');
+            $table->index('target_branch_id');
+            $table->index('suplier_id');
+            $table->index('return_date');
+            $table->index('type');
+        });
+
+        // Delivery Orders - query by warehouses, date, status
+        Schema::table('delivery_orders_models', function (Blueprint $table) {
+            $table->index('warehose_from');
+            $table->index('warehose_to');
+            $table->index('delivery_date');
+            $table->index('status');
+        });
+
+        // Cashier Shifts - query by cashier, branch, date
+        Schema::table('cashier_shifts_models', function (Blueprint $table) {
+            $table->index('cashier_id');
+            $table->index('branch_id');
+            $table->index('shift_start');
+            $table->index('status');
+            $table->index(['cashier_id', 'status']); // cek shift aktif kasir
+        });
+
+        // Notifications - query by user, branch, read status
+        Schema::table('notifications_models', function (Blueprint $table) {
+            $table->index('user_id');
+            $table->index('branch_id');
+            $table->index('is_read');
+            $table->index(['user_id', 'is_read']); // notif belum dibaca per user
+        });
+
+        // Users - query by role, branch
+        Schema::table('users', function (Blueprint $table) {
+            $table->index('role_id');
+            $table->index('branch_id');
+        });
+
+        // Warehouses - query by branch
+        Schema::table('warehoses_models', function (Blueprint $table) {
+            $table->index('branch_id');
+            $table->index('is_main');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('products_models', function (Blueprint $table) {
+            $table->dropIndex(['category_id']);
+            $table->dropIndex(['is_active']);
+            $table->dropIndex(['category_id', 'is_active']);
+        });
+
+        Schema::table('stock_models', function (Blueprint $table) {
+            $table->dropIndex(['product_id']);
+            $table->dropIndex(['warehouse_id']);
+            $table->dropIndex(['product_id', 'warehouse_id']);
+        });
+
+        Schema::table('batches_models', function (Blueprint $table) {
+            $table->dropIndex(['product_id']);
+            $table->dropIndex(['warehouse_id']);
+            $table->dropIndex(['expiry_date']);
+            $table->dropIndex(['expiry_date', 'warehouse_id']);
+        });
+
+        Schema::table('prices_models', function (Blueprint $table) {
+            $table->dropIndex(['product_id']);
+            $table->dropIndex(['branch_id']);
+            $table->dropIndex(['is_default']);
+            $table->dropIndex(['product_id', 'branch_id', 'is_default']);
+            $table->dropIndex(['valid_from', 'valid_until']);
+        });
+
+        Schema::table('discounts_models', function (Blueprint $table) {
+            $table->dropIndex(['product_id']);
+            $table->dropIndex(['branch_id']);
+            $table->dropIndex(['type']);
+            $table->dropIndex(['valid_from', 'valid_until']);
+            $table->dropIndex(['product_id', 'branch_id', 'type']);
+        });
+
+        Schema::table('sales_models', function (Blueprint $table) {
+            $table->dropIndex(['branch_id']);
+            $table->dropIndex(['cashier_id']);
+            $table->dropIndex(['sale_date']);
+            $table->dropIndex(['status']);
+            $table->dropIndex(['branch_id', 'sale_date']);
+            $table->dropIndex(['cashier_id', 'sale_date']);
+        });
+
+        Schema::table('purchase_orders_models', function (Blueprint $table) {
+            $table->dropIndex(['suplier_id']);
+            $table->dropIndex(['warehouse_id']);
+            $table->dropIndex(['order_date']);
+            $table->dropIndex(['status']);
+            $table->dropIndex(['status', 'order_date']);
+        });
+
+        Schema::table('goods_receipts_models', function (Blueprint $table) {
+            $table->dropIndex(['purchase_order_id']);
+            $table->dropIndex(['warehouse_id']);
+            $table->dropIndex(['receipt_date']);
+            $table->dropIndex(['status']);
+        });
+
+        Schema::table('returns_models', function (Blueprint $table) {
+            $table->dropIndex(['source_branch_id']);
+            $table->dropIndex(['target_branch_id']);
+            $table->dropIndex(['suplier_id']);
+            $table->dropIndex(['return_date']);
+            $table->dropIndex(['type']);
+        });
+
+        Schema::table('delivery_orders_models', function (Blueprint $table) {
+            $table->dropIndex(['warehose_from']);
+            $table->dropIndex(['warehose_to']);
+            $table->dropIndex(['delivery_date']);
+            $table->dropIndex(['status']);
+        });
+
+        Schema::table('cashier_shifts_models', function (Blueprint $table) {
+            $table->dropIndex(['cashier_id']);
+            $table->dropIndex(['branch_id']);
+            $table->dropIndex(['shift_start']);
+            $table->dropIndex(['status']);
+            $table->dropIndex(['cashier_id', 'status']);
+        });
+
+        Schema::table('notifications_models', function (Blueprint $table) {
+            $table->dropIndex(['user_id']);
+            $table->dropIndex(['branch_id']);
+            $table->dropIndex(['is_read']);
+            $table->dropIndex(['user_id', 'is_read']);
+        });
+
+        Schema::table('users', function (Blueprint $table) {
+            $table->dropIndex(['role_id']);
+            $table->dropIndex(['branch_id']);
+        });
+
+        Schema::table('warehoses_models', function (Blueprint $table) {
+            $table->dropIndex(['branch_id']);
+            $table->dropIndex(['is_main']);
+        });
+    }
+};
+
+
+=== FILE: D:\laragon\www\kasir-v2\database\migrations\2025_10_24_071305_add_soft_deletes_to_tables.php ===
+
+<?php
+
+// ============================================
+// PART 1: MIGRATION - TAMBAH DELETED_AT COLUMN
+// ============================================
+
+// File: database/migrations/xxxx_add_soft_deletes_to_tables.php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        // Tabel-tabel yang PERLU soft delete
+
+        // 1. Master Data (bisa di-restore)
+        Schema::table('products_models', function (Blueprint $table) {
+            $table->softDeletes(); // Menambah kolom deleted_at
+        });
+
+        Schema::table('categories_models', function (Blueprint $table) {
+            $table->softDeletes();
+        });
+
+        Schema::table('supliers_models', function (Blueprint $table) {
+            $table->softDeletes();
+        });
+
+        Schema::table('branches_models', function (Blueprint $table) {
+            $table->softDeletes();
+        });
+
+        Schema::table('warehoses_models', function (Blueprint $table) {
+            $table->softDeletes();
+        });
+
+        Schema::table('users', function (Blueprint $table) {
+            $table->softDeletes();
+        });
+
+        // 2. Pricing & Discounts (history penting)
+        Schema::table('prices_models', function (Blueprint $table) {
+            $table->softDeletes();
+        });
+
+        Schema::table('discounts_models', function (Blueprint $table) {
+            $table->softDeletes();
+        });
+
+        // 3. Transaksi (audit trail)
+        Schema::table('sales_models', function (Blueprint $table) {
+            $table->softDeletes();
+        });
+
+        Schema::table('purchase_orders_models', function (Blueprint $table) {
+            $table->softDeletes();
+        });
+
+        Schema::table('goods_receipts_models', function (Blueprint $table) {
+            $table->softDeletes();
+        });
+
+        Schema::table('returns_models', function (Blueprint $table) {
+            $table->softDeletes();
+        });
+
+        Schema::table('delivery_orders_models', function (Blueprint $table) {
+            $table->softDeletes();
+        });
+
+        // 4. Batch & Stock (tracking penting)
+        Schema::table('batches_models', function (Blueprint $table) {
+            $table->softDeletes();
+        });
+
+        Schema::table('stock_models', function (Blueprint $table) {
+            $table->softDeletes();
+        });
+
+        // 5. Shift Kasir (audit trail)
+        Schema::table('cashier_shifts_models', function (Blueprint $table) {
+            $table->softDeletes();
+        });
+
+        // 6. Notifications (opsional, bisa dihapus permanen juga)
+        Schema::table('notifications_models', function (Blueprint $table) {
+            $table->softDeletes();
+        });
+
+        /*
+        TIDAK PERLU SOFT DELETE (hapus permanen):
+        - saleitems_models (item detail, ikut parent)
+        - purchase_order_items_models (item detail)
+        - goods_receipt_items_models (item detail)
+        - delivery_order_items_models (item detail)
+        - return_items_models (item detail)
+        - role_models (master role, jarang berubah)
+        */
+    }
+
+    public function down(): void
+    {
+        Schema::table('products_models', function (Blueprint $table) {
+            $table->dropSoftDeletes();
+        });
+
+        Schema::table('categories_models', function (Blueprint $table) {
+            $table->dropSoftDeletes();
+        });
+
+        Schema::table('supliers_models', function (Blueprint $table) {
+            $table->dropSoftDeletes();
+        });
+
+        Schema::table('branches_models', function (Blueprint $table) {
+            $table->dropSoftDeletes();
+        });
+
+        Schema::table('warehoses_models', function (Blueprint $table) {
+            $table->dropSoftDeletes();
+        });
+
+        Schema::table('users', function (Blueprint $table) {
+            $table->dropSoftDeletes();
+        });
+
+        Schema::table('prices_models', function (Blueprint $table) {
+            $table->dropSoftDeletes();
+        });
+
+        Schema::table('discounts_models', function (Blueprint $table) {
+            $table->dropSoftDeletes();
+        });
+
+        Schema::table('sales_models', function (Blueprint $table) {
+            $table->dropSoftDeletes();
+        });
+
+        Schema::table('purchase_orders_models', function (Blueprint $table) {
+            $table->dropSoftDeletes();
+        });
+
+        Schema::table('goods_receipts_models', function (Blueprint $table) {
+            $table->dropSoftDeletes();
+        });
+
+        Schema::table('returns_models', function (Blueprint $table) {
+            $table->dropSoftDeletes();
+        });
+
+        Schema::table('delivery_orders_models', function (Blueprint $table) {
+            $table->dropSoftDeletes();
+        });
+
+        Schema::table('batches_models', function (Blueprint $table) {
+            $table->dropSoftDeletes();
+        });
+
+        Schema::table('stock_models', function (Blueprint $table) {
+            $table->dropSoftDeletes();
+        });
+
+        Schema::table('cashier_shifts_models', function (Blueprint $table) {
+            $table->dropSoftDeletes();
+        });
+
+        Schema::table('notifications_models', function (Blueprint $table) {
+            $table->dropSoftDeletes();
+        });
+    }
+};

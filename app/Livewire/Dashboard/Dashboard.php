@@ -58,6 +58,11 @@ class Dashboard extends Component
 
         // 🔔 Notifikasi Terbaru
         $this->notifications = notificationsModels::orderByDesc('created_at')->limit(5)->get();
+        $this->dispatch('alert', [
+            'title' => 'Data Dashboard Telah Dimuat',
+            'text' => 'Informasi terbaru telah diperbarui di dashboard.',
+            'icon' => 'success'
+        ]);
     }
 
     public function render()

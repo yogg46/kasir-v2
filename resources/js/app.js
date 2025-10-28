@@ -1,5 +1,6 @@
 // import './bootstrap';
 import './chart.umd.min.js'; // import Chart.js versi lokal
+import './alerts.js'; // import SweetAlert2 konfigurasi
 
 // Chart.js otomatis terpasang ke window.Chart (karena UMD build)
 document.addEventListener('DOMContentLoaded', () => {
@@ -22,3 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+
+
+

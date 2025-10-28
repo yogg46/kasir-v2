@@ -13,7 +13,8 @@ use App\Models\{
     cabangModel as Branch,
     gudangModel as Warehouse,
     salesModels as Sale,
-    saleitemsModels as SaleItem
+    saleitemsModels as SaleItem,
+    shiftKasirModel as shiftKasirModel,
 };
 use Illuminate\Support\Facades\Auth;
 
@@ -386,6 +387,10 @@ class POS extends Component
                 'notes'          => 'Customer: ' . ' | Bayar: Rp ' . number_format($this->paymentAmount, 0, ',', '.') . ' | Kembalian: Rp ' . number_format($this->getChange(), 0, ',', '.')
             ]);
 
+            $shif = shiftKasirModel::where('cashier_id', Auth::id())
+                ->where('status', 'open')
+                ->first();
+
             // create items and decrement stock
             foreach ($this->cart as $item) {
                 SaleItem::create([
@@ -409,6 +414,13 @@ class POS extends Component
                         $stock->decrement('quantity', $decrement);
                     }
                 }
+            }
+            
+            if ($shif) {
+                $uangAwal = $shif->cash_in + $this->getTotal();
+                $shif->update([
+                    'cash_in' => $uangAwal,
+                ]);
             }
 
             DB::commit();

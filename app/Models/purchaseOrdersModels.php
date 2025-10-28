@@ -45,6 +45,7 @@ class purchaseOrdersModels extends Model
 
             // Cari kode terakhir untuk hari ini, dan kunci baris agar tidak bentrok
             $latest = static::where('order_number', 'like', "{$prefix}-{$today}-%")
+            ->withTrashed()
                 ->orderByDesc('order_number')
                 ->lockForUpdate()
                 ->first();

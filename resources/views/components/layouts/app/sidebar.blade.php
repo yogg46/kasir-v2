@@ -32,6 +32,8 @@
             <flux:navlist.group :heading="__('Kasir')" class="grid">
                 <flux:navlist.item icon="home" :href="route('pos')" :current="request()->routeIs('pos')">
                     {{ __('Halaman Kasir') }}</flux:navlist.item>
+                <flux:navlist.item icon="home" :href="route('shift-kasir')" :current="request()->routeIs('shift-kasir')">
+                    {{ __('Shift Kasir') }}</flux:navlist.item>
             </flux:navlist.group>
         </flux:navlist>
 

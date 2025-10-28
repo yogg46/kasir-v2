@@ -1,0 +1,1709 @@
+
+
+=== FILE: D:\laragon\www\kasir-v2\app\Models\batchModel.php ===
+
+<?php
+
+namespace App\Models;
+
+use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
+class batchModel extends Model
+{
+   use HasFactory, HasUuids, SoftDeletes;
+
+    protected $table = 'batches_models';
+    protected $fillable = ['product_id', 'warehouse_id', 'code', 'expiry_date', 'quantity'];
+
+    protected static function boot()
+    {
+        parent::boot();
+        static::creating(function ($model) {
+            if (empty($model->code)) {
+                $model->code = self::generateIncrementCode('BCH');
+            }
+        });
+    }
+
+    protected static function generateIncrementCode($prefix)
+    {
+        return DB::transaction(function () use ($prefix) {
+            $today = now()->format('Ymd'); // Format tanggal: 20251017
+
+            // Cari kode terakhir untuk hari ini, dan kunci baris agar tidak bentrok
+            $latest = static::where('code', 'like', "{$prefix}-{$today}-%")
+                ->orderByDesc('code')
+                ->lockForUpdate()
+                ->first();
+
+            // Ambil nomor terakhir dari kode (setelah tanda "-")
+            if ($latest && preg_match('/-(\d+)$/', $latest->code, $matches)) {
+                $number = intval($matches[1]) + 1;
+            } else {
+                $number = 1; // Reset ke 1 jika belum ada untuk hari ini
+            }
+
+            // Format hasil akhir → WH-20251017-000001
+            return sprintf('%s-%s-%06d', $prefix, $today, $number);
+        });
+    }
+
+    public function toProduk()
+    {
+        return $this->belongsTo(produkModel::class, 'product_id');
+    }
+    public function toGudang()
+    {
+        return $this->belongsTo(gudangModel::class, 'warehouse_id');
+    }
+
+
+    // Cek apakah sudah expired
+    protected function isExpired(): Attribute
+    {
+        return Attribute::make(
+            get: fn() => $this->expiry_date
+                ? \Carbon\Carbon::parse($this->expiry_date)->isPast()
+                : false
+        );
+    }
+
+    // Hari sampai expired
+    protected function daysUntilExpiry(): Attribute
+    {
+        return Attribute::make(
+            get: fn() => $this->expiry_date
+                ? now()->diffInDays(\Carbon\Carbon::parse($this->expiry_date), false)
+                : null
+        );
+    }
+
+    // Status expiry (good/warning/danger)
+    protected function expiryStatus(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                if (!$this->expiry_date) return 'no-expiry';
+                $days = $this->days_until_expiry;
+                if ($days < 0) return 'expired';
+                if ($days <= 30) return 'danger';
+                if ($days <= 90) return 'warning';
+                return 'good';
+            }
+        );
+    }
+}
+
+
+=== FILE: D:\laragon\www\kasir-v2\app\Models\cabangModel.php ===
+
+<?php
+
+namespace App\Models;
+
+use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
+class cabangModel extends Model
+{
+   use HasFactory, HasUuids, SoftDeletes;
+    protected $table = 'branches_models';
+    protected $fillable = ['code', 'name', 'address', 'phone', 'is_head_office'];
+
+    protected $casts = [
+        'is_head_office' => 'boolean',
+    ];
+
+    protected static function boot()
+    {
+        parent::boot();
+        static::creating(function ($model) {
+            if (empty($model->code)) {
+                $model->code = self::generateIncrementCode('TK');
+            }
+        });
+    }
+
+    protected static function generateIncrementCode($prefix)
+    {
+        return DB::transaction(function () use ($prefix) {
+            // Ambil kode terakhir, lock baris agar tidak diakses bersamaan
+            $latest = static::where('code', 'like', "{$prefix}%")
+                ->orderByDesc('code')
+                ->lockForUpdate()
+                ->first();
+
+            // Tentukan prefix numerik saat ini (contoh: WH2 → 2, WH → 1)
+            $currentPrefixNumber = 1;
+
+            if ($latest && preg_match('/^' . preg_quote($prefix, '/') . '(\d*)-(\d+)$/', $latest->code, $matches)) {
+                $currentPrefixNumber = !empty($matches[1]) ? intval($matches[1]) : 1;
+                $number = intval($matches[2]);
+            } else {
+                $number = 0;
+            }
+
+            // Naikkan nomor urut
+            $number++;
+
+            // Jika sudah melebihi batas, naikkan prefix (WH → WH2, dst)
+            if ($number > 9999999) {
+                $currentPrefixNumber++;
+                $number = 1;
+            }
+
+            // Format prefix final: WH, WH2, WH3, dst
+            $finalPrefix = $currentPrefixNumber > 1 ? "{$prefix}{$currentPrefixNumber}" : $prefix;
+
+            return sprintf('%s-%07d', $finalPrefix, $number);
+        });
+    }
+
+    public function scopeSearch($query, $keyword)
+    {
+        if (!$keyword) return $query;
+        return $query->where(function ($q) use ($keyword) {
+            $q->orWhere('code', 'like', "%{$keyword}%")
+                ->orWhere('name', 'like', "%{$keyword}%")
+                ->orWhere('address', 'like', "%{$keyword}%")
+                ->orWhere('phone', 'like', "%{$keyword}%");
+        });
+    }
+
+    // 🔗 Relasi
+    public function toGudang()
+    {
+        return $this->hasMany(gudangModel::class, 'branch_id');
+    }
+    public function toUsers()
+    {
+        return $this->hasMany(User::class, 'branch_id');
+    }
+    public function toHarga()
+    {
+        return $this->hasMany(hargaModel::class, 'branch_id');
+    }
+
+    public function toReturnsAsSource()
+    {
+        return $this->hasMany(returModel::class, 'source_branch_id');
+    }
+
+    public function toReturnsAsTarget()
+    {
+        return $this->hasMany(returModel::class, 'target_branch_id');
+    }
+}
+
+
+=== FILE: D:\laragon\www\kasir-v2\app\Models\deliveryOrderItemsModels.php ===
+
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
+class deliveryOrderItemsModels extends Model
+{
+    use HasFactory, HasUuids, SoftDeletes;
+
+    protected $table = 'delivery_order_items_models';
+    protected $fillable = ['delivery_order_id', 'product_id', 'quantity'];
+
+    public function toDeliveryOrder()
+    {
+        return $this->belongsTo(deliveryOrdersModels::class, 'delivery_order_id');
+    }
+    public function toProduk()
+    {
+        return $this->belongsTo(produkModel::class, 'product_id');
+    }
+}
+
+
+=== FILE: D:\laragon\www\kasir-v2\app\Models\deliveryOrdersModels.php ===
+
+<?php
+
+namespace App\Models;
+
+use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
+class deliveryOrdersModels extends Model
+{
+    use HasFactory, HasUuids, SoftDeletes;
+    protected $table = 'delivery_orders_models';
+    protected $fillable = ['warehose_from', 'warehose_to', 'delivery_number', 'delivery_date', 'status', 'notes'];
+
+    protected static function boot()
+    {
+        parent::boot();
+        static::creating(function ($model) {
+            if (empty($model->delivery_number)) {
+                $model->delivery_number = self::generateIncrementCode('DO');
+            }
+        });
+    }
+
+    protected static function generateIncrementCode($prefix)
+    {
+        return DB::transaction(function () use ($prefix) {
+            $today = now()->format('Ymd'); // Format tanggal: 20251017
+
+            // Cari kode terakhir untuk hari ini, dan kunci baris agar tidak bentrok
+            $latest = static::where('delivery_number', 'like', "{$prefix}-{$today}-%")
+                ->orderByDesc('delivery_number')
+                ->lockForUpdate()
+                ->first();
+
+            // Ambil nomor terakhir dari kode (setelah tanda "-")
+            if ($latest && preg_match('/-(\d+)$/', $latest->delivery_number, $matches)) {
+                $number = intval($matches[1]) + 1;
+            } else {
+                $number = 1; // Reset ke 1 jika belum ada untuk hari ini
+            }
+
+            // Format hasil akhir → WH-20251017-000001
+            return sprintf('%s-%s-%06d', $prefix, $today, $number);
+        });
+    }
+
+    public function toGudangFrom()
+    {
+        return $this->belongsTo(gudangModel::class, 'warehose_from');
+    }
+    public function toGudangTo()
+    {
+        return $this->belongsTo(gudangModel::class, 'warehose_to');
+    }
+    public function toItems()
+    {
+        return $this->hasMany(deliveryOrderItemsModels::class, 'delivery_order_id');
+    }
+}
+
+
+=== FILE: D:\laragon\www\kasir-v2\app\Models\diskonModel.php ===
+
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
+class diskonModel extends Model
+{
+    use HasFactory, HasUuids, SoftDeletes;
+
+    protected $table = 'discounts_models';
+    protected $fillable = [
+        'price_id',
+        'branch_id',
+        'product_id',
+        'type',
+        'discount_percent',
+        'discount_amount',
+        'valid_from',
+        'valid_until',
+        'notes'
+    ];
+
+    public function scopeSearch($query, $keyword)
+    {
+        if (!$keyword) return $query;
+        return $query->where(function ($q) use ($keyword) {
+            $q->orWhere('type', 'like', "%{$keyword}%")
+                ->orWhere('notes', 'like', "%{$keyword}%");
+        });
+    }
+
+    // 🔗 Relasi
+    public function toHarga()
+    {
+        return $this->belongsTo(hargaModel::class, 'price_id');
+    }
+    public function toCabang()
+    {
+        return $this->belongsTo(cabangModel::class, 'branch_id');
+    }
+    public function toProduk()
+    {
+        return $this->belongsTo(produkModel::class, 'product_id');
+    }
+}
+
+
+=== FILE: D:\laragon\www\kasir-v2\app\Models\gudangModel.php ===
+
+<?php
+
+namespace App\Models;
+
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
+class gudangModel extends Model
+{
+    use HasFactory, HasUuids, SoftDeletes;
+
+    protected $table = 'warehoses_models';
+    protected $fillable = ['branch_id', 'code', 'name', 'address', 'is_main'];
+
+    protected $casts = ['is_main' => 'boolean'];
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($model) {
+            if (empty($model->code)) {
+                $model->code = self::generateIncrementCode('GD');
+            }
+        });
+    }
+
+    protected static function generateIncrementCode($prefix)
+    {
+        return DB::transaction(function () use ($prefix) {
+            // Ambil kode terakhir, lock baris agar tidak diakses bersamaan
+            $latest = static::where('code', 'like', "{$prefix}%")
+                ->orderByDesc('code')
+                ->lockForUpdate()
+                ->first();
+
+            // Tentukan prefix numerik saat ini (contoh: WH2 → 2, WH → 1)
+            $currentPrefixNumber = 1;
+
+            if ($latest && preg_match('/^' . preg_quote($prefix, '/') . '(\d*)-(\d+)$/', $latest->code, $matches)) {
+                $currentPrefixNumber = !empty($matches[1]) ? intval($matches[1]) : 1;
+                $number = intval($matches[2]);
+            } else {
+                $number = 0;
+            }
+
+            // Naikkan nomor urut
+            $number++;
+
+            // Jika sudah melebihi batas, naikkan prefix (WH → WH2, dst)
+            if ($number > 9999999) {
+                $currentPrefixNumber++;
+                $number = 1;
+            }
+
+            // Format prefix final: WH, WH2, WH3, dst
+            $finalPrefix = $currentPrefixNumber > 1 ? "{$prefix}{$currentPrefixNumber}" : $prefix;
+
+            return sprintf('%s-%07d', $finalPrefix, $number);
+        });
+    }
+
+    public function scopeSearch($query, $keyword)
+    {
+        if (!$keyword) return $query;
+        return $query->where(function ($q) use ($keyword) {
+            $q->orWhere('code', 'like', "%{$keyword}%")
+                ->orWhere('name', 'like', "%{$keyword}%")
+                ->orWhere('address', 'like', "%{$keyword}%");
+        });
+    }
+
+    // 🔗 Relasi
+    public function toCabang()
+    {
+        return $this->belongsTo(cabangModel::class, 'branch_id');
+    }
+    public function toStocks()
+    {
+        return $this->hasMany(stockModels::class, 'warehouse_id');
+    }
+    public function toPurchaseOrders()
+    {
+        return $this->hasMany(purchaseOrdersModels::class, 'warehouse_id');
+    }
+}
+
+
+=== FILE: D:\laragon\www\kasir-v2\app\Models\hargaModel.php ===
+
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
+class hargaModel extends Model
+{
+    use HasFactory, HasUuids, SoftDeletes;
+    protected $table = 'prices_models';
+    protected $fillable = [
+        'product_id',
+        'branch_id',
+        'unit_name',
+        'unit_qty',
+        'price',
+        'old_price',
+        'purchase_price',
+        'is_default',
+        'valid_from',
+        'valid_until',
+        'notes'
+    ];
+
+    protected $casts = ['is_default' => 'boolean'];
+
+    public function scopeSearch($query, $keyword)
+    {
+        if (!$keyword) return $query;
+        return $query->where(function ($q) use ($keyword) {
+            $q->orWhere('unit_name', 'like', "%{$keyword}%")
+                ->orWhere('notes', 'like', "%{$keyword}%");
+        });
+    }
+
+    public function toPoduk()
+    {
+        return $this->belongsTo(produkModel::class, 'product_id');
+    }
+    public function toCabang()
+    {
+        return $this->belongsTo(cabangModel::class, 'branch_id');
+    }
+
+
+    // Format harga rupiah
+    protected function priceFormatted(): Attribute
+    {
+        return Attribute::make(
+            get: fn() => 'Rp ' . number_format($this->price, 0, ',', '.')
+        );
+    }
+
+    protected function purchasePriceFormatted(): Attribute
+    {
+        return Attribute::make(
+            get: fn() => $this->purchase_price
+                ? 'Rp ' . number_format($this->purchase_price, 0, ',', '.')
+                : '-'
+        );
+    }
+
+    // Margin keuntungan
+    protected function profitMargin(): Attribute
+    {
+        return Attribute::make(
+            get: fn() => $this->purchase_price
+                ? round((($this->price - $this->purchase_price) / $this->purchase_price) * 100, 2)
+                : 0
+        );
+    }
+
+    // Status validity
+    protected function isValid(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                $now = now();
+                $from = $this->valid_from ? \Carbon\Carbon::parse($this->valid_from) : null;
+                $until = $this->valid_until ? \Carbon\Carbon::parse($this->valid_until) : null;
+
+                if (!$from && !$until) return true;
+                if ($from && $now < $from) return false;
+                if ($until && $now > $until) return false;
+                return true;
+            }
+        );
+    }
+}
+
+
+=== FILE: D:\laragon\www\kasir-v2\app\Models\itemPenerimaanBarangModel.php ===
+
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
+class itemPenerimaanBarangModel extends Model
+{
+    use HasFactory, HasUuids;
+
+    protected $table = 'goods_receipt_items_models';
+    protected $fillable = ['goods_receipt_id', 'product_id', 'batch_id', 'quantity', 'price', 'subtotal'];
+
+    public function toGoodsReceipt()
+    {
+        return $this->belongsTo(penerimaanBarangModel::class, 'goods_receipt_id');
+    }
+    public function toProduk()
+    {
+        return $this->belongsTo(produkModel::class, 'product_id');
+    }
+    public function toBatch()
+    {
+        return $this->belongsTo(batchModel::class, 'batch_id');
+    }
+}
+
+
+=== FILE: D:\laragon\www\kasir-v2\app\Models\itemReturModel.php ===
+
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
+class itemReturModel extends Model
+{
+    use HasFactory, HasUuids;
+
+    protected $table = 'return_items_models';
+    protected $fillable = ['return_id', 'product_id', 'batch_id', 'quantity', 'price', 'subtotal', 'reason'];
+
+    public function toRetur()
+    {
+        return $this->belongsTo(returModel::class, 'return_id');
+    }
+    public function toProduk()
+    {
+        return $this->belongsTo(produkModel::class, 'product_id');
+    }
+    public function toBatch()
+    {
+        return $this->belongsTo(batchModel::class, 'batch_id');
+    }
+}
+
+
+=== FILE: D:\laragon\www\kasir-v2\app\Models\kategoriModel.php ===
+
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
+class kategoriModel extends Model
+{
+    use HasFactory, HasUuids, SoftDeletes;
+    protected $table = 'categories_models';
+    protected $fillable = ['name', 'description'];
+
+    public function scopeSearch($query, $keyword)
+    {
+        if (!$keyword) return $query;
+        return $query->where('name', 'like', "%{$keyword}%")
+            ->orWhere('description', 'like', "%{$keyword}%");
+    }
+
+    public function toProduk()
+    {
+        return $this->hasMany(produkModel::class, 'category_id');
+    }
+}
+
+
+=== FILE: D:\laragon\www\kasir-v2\app\Models\notificationsModels.php ===
+
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
+class notificationsModels extends Model
+{
+    use HasFactory, HasUuids, SoftDeletes;
+
+    protected $table = 'notifications_models';
+    protected $fillable = [
+        'user_id',
+        'branch_id',
+        'title',
+        'message',
+        'type',
+        'meta_data',
+        'is_read'
+    ];
+
+    protected $casts = [
+        'meta_data' => 'array',
+        'is_read' => 'boolean'
+    ];
+
+    public function scopeSearch($query, $keyword)
+    {
+        if (!$keyword) return $query;
+        return $query->where('title', 'like', "%{$keyword}%")
+            ->orWhere('message', 'like', "%{$keyword}%")
+            ->orWhere('type', 'like', "%{$keyword}%");
+    }
+
+    public function toUser()
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
+    public function toCabang()
+    {
+        return $this->belongsTo(cabangModel::class, 'branch_id');
+    }
+}
+
+
+=== FILE: D:\laragon\www\kasir-v2\app\Models\penerimaanBarangModel.php ===
+
+<?php
+
+namespace App\Models;
+
+use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
+class penerimaanBarangModel extends Model
+{
+    use HasFactory, HasUuids, SoftDeletes;
+    protected $table = 'goods_receipts_models';
+    protected $fillable = [
+        'purchase_order_id',
+        'warehouse_id',
+        'receipt_number',
+        'receipt_date',
+        'received_by',
+        'status',
+        'total',
+        'notes'
+    ];
+
+    protected $casts = [
+        'receipt_date' => 'datetime',
+        'total' => 'decimal:2',  // ✅ UNCOMMENT INI (hapus komen)
+    ];
+
+
+    protected static function boot()
+    {
+        parent::boot();
+        static::creating(function ($model) {
+            if (empty($model->receipt_number)) {
+                $model->receipt_number = self::generateIncrementCode('RCV');
+            }
+        });
+    }
+
+    protected static function generateIncrementCode($prefix)
+    {
+        return DB::transaction(function () use ($prefix) {
+            $today = now()->format('Ymd'); // Format tanggal: 20251017
+
+            // Cari kode terakhir untuk hari ini, dan kunci baris agar tidak bentrok
+            $latest = static::where('receipt_number', 'like', "{$prefix}-{$today}-%")
+                ->orderByDesc('receipt_number')
+                ->lockForUpdate()
+                ->first();
+
+            // Ambil nomor terakhir dari kode (setelah tanda "-")
+            if ($latest && preg_match('/-(\d+)$/', $latest->receipt_number, $matches)) {
+                $number = intval($matches[1]) + 1;
+            } else {
+                $number = 1; // Reset ke 1 jika belum ada untuk hari ini
+            }
+
+            // Format hasil akhir → WH-20251017-000001
+            return sprintf('%s-%s-%06d', $prefix, $today, $number);
+        });
+    }
+
+    public function toPurchaseOrder()
+    {
+        return $this->belongsTo(purchaseOrdersModels::class, 'purchase_order_id');
+    }
+    public function toGudang()
+    {
+        return $this->belongsTo(gudangModel::class, 'warehouse_id');
+    }
+    public function toItems()
+    {
+        return $this->hasMany(itemPenerimaanBarangModel::class, 'goods_receipt_id');
+    }
+}
+
+
+=== FILE: D:\laragon\www\kasir-v2\app\Models\produkModel.php ===
+
+<?php
+
+namespace App\Models;
+
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
+
+class produkModel extends Model
+{
+    use HasFactory, HasUuids, SoftDeletes;
+
+    protected $table = 'products_models';
+    protected $fillable = [
+        'category_id',
+        // 'suplier_id',
+        'code',
+        'name',
+        'description',
+        'barcode',
+        'type',
+        'notes',
+        'is_active'
+    ];
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($model) {
+            if (empty($model->code)) {
+                $model->code = self::generateIncrementCode('PRD');
+            }
+        });
+    }
+
+    protected static function generateIncrementCode($prefix)
+    {
+        return DB::transaction(function () use ($prefix) {
+            // Ambil kode terakhir, lock baris agar tidak diakses bersamaan
+            $latest = static::where('code', 'like', "{$prefix}%")
+                ->orderByDesc('code')
+                ->lockForUpdate()
+                ->first();
+
+            // Tentukan prefix numerik saat ini (contoh: WH2 → 2, WH → 1)
+            $currentPrefixNumber = 1;
+
+            if ($latest && preg_match('/^' . preg_quote($prefix, '/') . '(\d*)-(\d+)$/', $latest->code, $matches)) {
+                $currentPrefixNumber = !empty($matches[1]) ? intval($matches[1]) : 1;
+                $number = intval($matches[2]);
+            } else {
+                $number = 0;
+            }
+
+            // Naikkan nomor urut
+            $number++;
+
+            // Jika sudah melebihi batas, naikkan prefix (WH → WH2, dst)
+            if ($number > 9999999) {
+                $currentPrefixNumber++;
+                $number = 1;
+            }
+
+            // Format prefix final: WH, WH2, WH3, dst
+            $finalPrefix = $currentPrefixNumber > 1 ? "{$prefix}{$currentPrefixNumber}" : $prefix;
+
+            return sprintf('%s-%07d', $finalPrefix, $number);
+        });
+    }
+
+    public function scopeSearch($query, $keyword)
+    {
+        if (!$keyword) return $query;
+
+        // Default: tidak include yang dihapus
+        return $query->where(function ($q) use ($keyword) {
+            $q->orWhere('code', 'like', "%{$keyword}%")
+                ->orWhere('name', 'like', "%{$keyword}%")
+                ->orWhere('barcode', 'like', "%{$keyword}%")
+                ->orWhere('description', 'like', "%{$keyword}%");
+        });
+    }
+
+    // Scope baru untuk include trashed
+    public function scopeSearchWithTrashed($query, $keyword)
+    {
+        return $this->scopeSearch($query, $keyword)->withTrashed();
+    }
+
+    // Scope untuk hanya yang trashed
+    public function scopeOnlyDeleted($query)
+    {
+        return $query->onlyTrashed();
+    }
+
+    // 🔗 Relasiw
+    public function toKategori()
+    {
+        return $this->belongsTo(kategoriModel::class, 'category_id');
+    }
+    // public function toSupplier()
+    // {
+    //     return $this->belongsTo(supliersModels::class, 'suplier_id');
+    // }
+    public function toHarga()
+    {
+        return $this->hasMany(hargaModel::class, 'product_id');
+    }
+    public function toStocks()
+    {
+        return $this->hasMany(stockModels::class, 'product_id');
+    }
+    public function toBatches()
+    {
+        return $this->hasMany(batchModel::class, 'product_id');
+    }
+
+
+    // Accessor untuk status aktif/nonaktif
+    protected function isActiveText(): Attribute
+    {
+        return Attribute::make(
+            get: fn() => $this->is_active ? 'Aktif' : 'Nonaktif'
+        );
+    }
+
+    // Accessor untuk type badge color
+    protected function typeBadge(): Attribute
+    {
+        return Attribute::make(
+            get: fn() => match ($this->type) {
+                'umkm' => 'primary',
+                'seasonal' => 'warning',
+                'regular' => 'success',
+                default => 'secondary'
+            }
+        );
+    }
+
+    // Accessor untuk type label
+    protected function typeLabel(): Attribute
+    {
+        return Attribute::make(
+            get: fn() => match ($this->type) {
+                'umkm' => 'UMKM',
+                'seasonal' => 'Musiman',
+                'regular' => 'Regular',
+                default => 'Unknown'
+            }
+        );
+    }
+
+    // Total stok semua gudang
+    protected function totalStock(): Attribute
+    {
+        return Attribute::make(
+            get: fn() => $this->toStocks()->sum('quantity')
+        );
+    }
+
+    protected function deletedStatus(): Attribute
+    {
+        return Attribute::make(
+            get: fn() => $this->trashed() ? 'Dihapus' : 'Aktif'
+        );
+    }
+}
+
+
+=== FILE: D:\laragon\www\kasir-v2\app\Models\purchaseOrderItemsModels.php ===
+
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
+class purchaseOrderItemsModels extends Model
+{
+    use HasFactory, HasUuids;
+
+   
+
+    protected $table = 'purchase_order_items_models';
+    protected $fillable = ['purchase_order_id', 'product_id', 'quantity', 'price', 'subtotal'];
+
+    public function toPurchaseOrder()
+    {
+        return $this->belongsTo(purchaseOrdersModels::class, 'purchase_order_id');
+    }
+    public function toProduk()
+    {
+        return $this->belongsTo(produkModel::class, 'product_id');
+    }
+}
+
+
+=== FILE: D:\laragon\www\kasir-v2\app\Models\purchaseOrdersModels.php ===
+
+<?php
+
+namespace App\Models;
+
+use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
+class purchaseOrdersModels extends Model
+{
+    use HasFactory, HasUuids, SoftDeletes;
+
+    protected $table = 'purchase_orders_models';
+    protected $fillable = [
+        'suplier_id',
+        'warehouse_id',
+        'order_number',
+        'order_date',
+        'total',
+        'status',
+        'notes'
+    ];
+    protected $casts = [
+        'order_date' => 'datetime',
+        'total' => 'decimal:2',
+    ];
+
+    protected static function boot()
+    {
+        parent::boot();
+        static::creating(function ($model) {
+            if (empty($model->order_number)) {
+                $model->order_number = self::generateIncrementCode('PO');
+            }
+        });
+    }
+
+    protected static function generateIncrementCode($prefix)
+    {
+        return DB::transaction(function () use ($prefix) {
+            $today = now()->format('Ymd'); // Format tanggal: 20251017
+
+            // Cari kode terakhir untuk hari ini, dan kunci baris agar tidak bentrok
+            $latest = static::where('order_number', 'like', "{$prefix}-{$today}-%")
+                ->orderByDesc('order_number')
+                ->lockForUpdate()
+                ->first();
+
+            // Ambil nomor terakhir dari kode (setelah tanda "-")
+            if ($latest && preg_match('/-(\d+)$/', $latest->order_number, $matches)) {
+                $number = intval($matches[1]) + 1;
+            } else {
+                $number = 1; // Reset ke 1 jika belum ada untuk hari ini
+            }
+
+            // Format hasil akhir → WH-20251017-000001
+            return sprintf('%s-%s-%06d', $prefix, $today, $number);
+        });
+    }
+
+    public function scopeSearch($query, $keyword)
+    {
+        if (!$keyword) return $query;
+        return $query->where('order_number', 'like', "%{$keyword}%")
+            ->orWhere('notes', 'like', "%{$keyword}%");
+    }
+
+    public function toSupplier()
+    {
+        return $this->belongsTo(supliersModels::class, 'suplier_id');
+    }
+    public function toGudang()
+    {
+        return $this->belongsTo(gudangModel::class, 'warehouse_id');
+    }
+    public function toItems()
+    {
+        return $this->hasMany(purchaseOrderItemsModels::class, 'purchase_order_id');
+    }
+
+     // Total formatted
+    protected function totalFormatted(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => 'Rp ' . number_format($this->total, 0, ',', '.')
+        );
+    }
+
+    // Status badge
+    protected function statusBadge(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => match($this->status) {
+                'draf' => 'secondary',
+                'approved' => 'info',
+                'received' => 'success',
+                'cancelled' => 'danger',
+                default => 'secondary'
+            }
+        );
+    }
+
+    // Status label
+    protected function statusLabel(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => match($this->status) {
+                'draf' => 'Draft',
+                'approved' => 'Disetujui',
+                'received' => 'Diterima',
+                'cancelled' => 'Dibatalkan',
+                default => 'Unknown'
+            }
+        );
+    }
+}
+
+
+=== FILE: D:\laragon\www\kasir-v2\app\Models\returModel.php ===
+
+<?php
+
+namespace App\Models;
+
+use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
+class returModel extends Model
+{
+    use HasFactory, HasUuids, SoftDeletes;
+
+    protected $table = 'returns_models';
+    protected $fillable = [
+        'source_branch_id',
+        'target_branch_id',
+        'suplier_id',
+        'return_number',
+        'type',
+        'notes',
+        'return_date'
+    ];
+
+    protected static function boot()
+    {
+        parent::boot();
+        static::creating(function ($model) {
+            if (empty($model->return_number)) {
+                $model->return_number = self::generateIncrementCode('RTN');
+            }
+        });
+    }
+
+    protected static function generateIncrementCode($prefix)
+    {
+        return DB::transaction(function () use ($prefix) {
+            $today = now()->format('Ymd'); // Format tanggal: 20251017
+
+            // Cari kode terakhir untuk hari ini, dan kunci baris agar tidak bentrok
+            $latest = static::where('return_number', 'like', "{$prefix}-{$today}-%")
+                ->orderByDesc('return_number')
+                ->lockForUpdate()
+                ->first();
+
+            // Ambil nomor terakhir dari kode (setelah tanda "-")
+            if ($latest && preg_match('/-(\d+)$/', $latest->return_number, $matches)) {
+                $number = intval($matches[1]) + 1;
+            } else {
+                $number = 1; // Reset ke 1 jika belum ada untuk hari ini
+            }
+
+            // Format hasil akhir → WH-20251017-000001
+            return sprintf('%s-%s-%06d', $prefix, $today, $number);
+        });
+    }
+
+    public function toSourceBranch()
+    {
+        return $this->belongsTo(cabangModel::class, 'source_branch_id');
+    }
+
+    public function toTargetBranch()
+    {
+        return $this->belongsTo(cabangModel::class, 'target_branch_id');
+    }
+
+    public function toSupplier()
+    {
+        return $this->belongsTo(supliersModels::class, 'suplier_id');
+    }
+    public function toItems()
+    {
+        return $this->hasMany(itemReturModel::class, 'return_id');
+    }
+}
+
+
+=== FILE: D:\laragon\www\kasir-v2\app\Models\roleModels.php ===
+
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
+class roleModels extends Model
+{
+    use HasFactory;
+
+    protected $table = 'role_models';
+    protected $fillable = ['role'];
+
+    public function scopeSearch($query, $keyword)
+    {
+        if (!$keyword) return $query;
+        return $query->where('role', 'like', "%{$keyword}%");
+    }
+
+    public function toUsers()
+    {
+        return $this->hasMany(User::class, 'role_id');
+    }
+}
+
+
+=== FILE: D:\laragon\www\kasir-v2\app\Models\saleitemsModels.php ===
+
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
+class saleitemsModels extends Model
+{
+    use HasFactory, HasUuids;
+
+    protected $table = 'saleitems_models';
+    protected $fillable = ['sale_id', 'product_id', 'unit_name', 'quantity', 'price', 'discount', 'subtotal'];
+
+    public function toSale()
+    {
+        return $this->belongsTo(salesModels::class, 'sale_id');
+    }
+    public function toProduk()
+    {
+        return $this->belongsTo(produkModel::class, 'product_id');
+    }
+}
+
+
+=== FILE: D:\laragon\www\kasir-v2\app\Models\salesModels.php ===
+
+<?php
+
+namespace App\Models;
+
+use Log;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
+class salesModels extends Model
+{
+   use HasFactory, HasUuids, SoftDeletes;
+
+    protected $table = 'sales_models';
+
+    protected $fillable = [
+        'branch_id',
+        'cashier_id',
+        'sale_date',
+        'invoice_number',
+        'subtotal',
+        'total_amount',
+        'discount_total',
+        'payment_method',
+        'status',
+        'notes'
+    ];
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($model) {
+            if (empty($model->invoice_number)) {
+                $model->invoice_number = self::generateIncrementCodeWithRetry('INV');
+            }
+        });
+    }
+
+    /**
+     * Generate invoice number dengan retry logic
+     *
+     * @param string $prefix
+     * @param int $maxRetries
+     * @return string
+     * @throws \Exception
+     */
+    protected static function generateIncrementCodeWithRetry($prefix, $maxRetries = 5)
+    {
+        $attempt = 0;
+        $lastException = null;
+
+        while ($attempt < $maxRetries) {
+            try {
+                return self::generateIncrementCode($prefix);
+            } catch (\Exception $e) {
+                $lastException = $e;
+                $attempt++;
+
+                // Log percobaan retry
+                // \Log::warning("Invoice generation retry attempt {$attempt}/{$maxRetries}", [
+                //     'prefix' => $prefix,
+                //     'error' => $e->getMessage()
+                // ]);
+
+                // Tunggu sebentar sebelum retry (exponential backoff)
+                usleep(50000 * $attempt); // 50ms, 100ms, 150ms, dst
+            }
+        }
+
+        // Jika semua retry gagal
+        // Log::error("Failed to generate invoice number after {$maxRetries} attempts", [
+        //     'prefix' => $prefix,
+        //     'last_error' => $lastException->getMessage()
+        // ]);
+
+        throw new \Exception("Gagal membuat nomor invoice setelah {$maxRetries} percobaan. Silakan coba lagi.");
+    }
+
+    /**
+     * Generate increment code untuk invoice number
+     *
+     * @param string $prefix
+     * @return string
+     */
+    protected static function generateIncrementCode($prefix)
+    {
+        return DB::transaction(function () use ($prefix) {
+            $today = now()->format('Ymd');
+
+            // Ambil invoice terakhir untuk hari ini dengan lock
+            $latest = static::where('invoice_number', 'like', "{$prefix}-{$today}-%")
+                ->orderByDesc('invoice_number')
+                ->lockForUpdate()
+                ->first();
+
+            // Tentukan nomor berikutnya
+            if ($latest && preg_match('/-(\d+)$/', $latest->invoice_number, $matches)) {
+                $number = intval($matches[1]) + 1;
+            } else {
+                $number = 1;
+            }
+
+            // Generate invoice number
+            $invoiceNumber = sprintf('%s-%s-%06d', $prefix, $today, $number);
+
+            // Double check: pastikan belum ada yang pakai
+            $checkAttempts = 0;
+            while (static::where('invoice_number', $invoiceNumber)->exists() && $checkAttempts < 10) {
+                $number++;
+                $invoiceNumber = sprintf('%s-%s-%06d', $prefix, $today, $number);
+                $checkAttempts++;
+            }
+
+            // Jika masih ada duplikasi setelah 10 kali check
+            if (static::where('invoice_number', $invoiceNumber)->exists()) {
+                throw new \Exception("Duplicate invoice number detected: {$invoiceNumber}");
+            }
+
+            return $invoiceNumber;
+        });
+    }
+
+    public function toCabang()
+    {
+        return $this->belongsTo(cabangModel::class, 'branch_id');
+    }
+
+    public function toKasir()
+    {
+        return $this->belongsTo(User::class, 'cashier_id');
+    }
+
+    public function toItems()
+    {
+        return $this->hasMany(saleitemsModels::class, 'sale_id');
+    }
+
+     // Format nominal
+    protected function subtotalFormatted(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => 'Rp ' . number_format($this->subtotal, 0, ',', '.')
+        );
+    }
+
+    protected function totalAmountFormatted(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => 'Rp ' . number_format($this->total_amount, 0, ',', '.')
+        );
+    }
+
+    protected function discountTotalFormatted(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => 'Rp ' . number_format($this->discount_total, 0, ',', '.')
+        );
+    }
+
+    // Status badge
+    protected function statusBadge(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => match($this->status) {
+                'paid' => 'success',
+                'void' => 'danger',
+                'refund' => 'warning',
+                default => 'secondary'
+            }
+        );
+    }
+
+    // Payment method label
+    protected function paymentMethodLabel(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => match($this->payment_method) {
+                'cash' => 'Tunai',
+                'qris' => 'QRIS',
+                'bank_transfer' => 'Transfer Bank',
+                default => 'Unknown'
+            }
+        );
+    }
+}
+
+
+=== FILE: D:\laragon\www\kasir-v2\app\Models\shiftKasirModel.php ===
+
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
+class shiftKasirModel extends Model
+{
+    use HasFactory, HasUuids, SoftDeletes;
+
+    protected $table = 'cashier_shifts_models';
+    protected $fillable = [
+        'cashier_id',
+        'branch_id',
+        'shift_start',
+        'shift_end',
+        'initial_cash',
+        'cash_in',
+        'cash_out',
+        'final_cash',
+        'status'
+    ];
+
+    public function toKasir()
+    {
+        return $this->belongsTo(User::class, 'cashier_id');
+    }
+    public function toCabang()
+    {
+        return $this->belongsTo(cabangModel::class, 'branch_id');
+    }
+
+    protected function shiftDuration(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                if (!$this->shift_end) return null;
+                return \Carbon\Carbon::parse($this->shift_start)
+                    ->diffInMinutes(\Carbon\Carbon::parse($this->shift_end));
+            }
+        );
+    }
+
+    // Selisih uang (expected vs actual)
+    protected function cashDifference(): Attribute
+    {
+        return Attribute::make(
+            get: fn() => $this->final_cash - ($this->initial_cash + $this->cash_in - $this->cash_out)
+        );
+    }
+
+    // Status selisih
+    protected function cashStatus(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                $diff = $this->cash_difference;
+                if ($diff == 0) return 'balanced';
+                return $diff > 0 ? 'over' : 'short';
+            }
+        );
+    }
+}
+
+
+=== FILE: D:\laragon\www\kasir-v2\app\Models\stockModels.php ===
+
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
+class stockModels extends Model
+{
+   use HasFactory, HasUuids, SoftDeletes;
+
+    protected $table = 'stock_models';
+    protected $fillable = ['product_id', 'warehouse_id', 'branch_id', 'quantity'];
+
+    public function toProduk()
+    {
+        return $this->belongsTo(produkModel::class, 'product_id');
+    }
+    public function toGudang()
+    {
+        return $this->belongsTo(gudangModel::class, 'warehouse_id');
+    }
+    public function toCabang()
+    {
+        return $this->belongsTo(cabangModel::class, 'branch_id');
+    }
+}
+
+
+=== FILE: D:\laragon\www\kasir-v2\app\Models\supliersModels.php ===
+
+<?php
+
+namespace App\Models;
+
+use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
+class supliersModels extends Model
+{
+   use HasFactory, HasUuids, SoftDeletes;
+
+    protected $table = 'supliers_models';
+    protected $fillable = ['code', 'name', 'address', 'phone'];
+
+    protected static function boot()
+    {
+        parent::boot();
+        static::creating(function ($model) {
+            if (empty($model->code)) {
+                $model->code = self::generateIncrementCode('SUP');
+            }
+        });
+    }
+
+    protected static function generateIncrementCode($prefix)
+    {
+        return DB::transaction(function () use ($prefix) {
+            // Ambil kode terakhir, lock baris agar tidak diakses bersamaan
+            $latest = static::where('code', 'like', "{$prefix}%")
+                ->orderByDesc('code')
+                ->lockForUpdate()
+                ->first();
+
+            // Tentukan prefix numerik saat ini (contoh: WH2 → 2, WH → 1)
+            $currentPrefixNumber = 1;
+
+            if ($latest && preg_match('/^' . preg_quote($prefix, '/') . '(\d*)-(\d+)$/', $latest->code, $matches)) {
+                $currentPrefixNumber = !empty($matches[1]) ? intval($matches[1]) : 1;
+                $number = intval($matches[2]);
+            } else {
+                $number = 0;
+            }
+
+            // Naikkan nomor urut
+            $number++;
+
+            // Jika sudah melebihi batas, naikkan prefix (WH → WH2, dst)
+            if ($number > 9999999) {
+                $currentPrefixNumber++;
+                $number = 1;
+            }
+
+            // Format prefix final: WH, WH2, WH3, dst
+            $finalPrefix = $currentPrefixNumber > 1 ? "{$prefix}{$currentPrefixNumber}" : $prefix;
+
+            return sprintf('%s-%07d', $finalPrefix, $number);
+        });
+    }
+
+    public function scopeSearch($query, $keyword)
+    {
+        if (!$keyword) return $query;
+        return $query->where(function ($q) use ($keyword) {
+            $q->orWhere('name', 'like', "%{$keyword}%")
+                ->orWhere('code', 'like', "%{$keyword}%")
+                ->orWhere('address', 'like', "%{$keyword}%")
+                ->orWhere('phone', 'like', "%{$keyword}%");
+        });
+    }
+
+    public function toProduk()
+    {
+        return $this->hasMany(produkModel::class, 'suplier_id');
+    }
+}
+
+
+=== FILE: D:\laragon\www\kasir-v2\app\Models\User.php ===
+
+<?php
+
+namespace App\Models;
+
+// use Illuminate\Contracts\Auth\MustVerifyEmail;
+
+use Illuminate\Support\Str;
+use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Laravel\Fortify\TwoFactorAuthenticatable;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+
+class User extends Authenticatable
+{
+    /** @use HasFactory<\Database\Factories\UserFactory> */
+    use HasFactory, Notifiable, TwoFactorAuthenticatable, HasUuids, SoftDeletes;
+
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var list<string>
+     */
+    protected $fillable = [
+        'name',
+        'email',
+        'password',
+        'username',
+        'role_id',
+        'branch_id',
+        'appearance'
+    ];
+
+    /**
+     * The attributes that should be hidden for serialization.
+     *
+     * @var list<string>
+     */
+    protected $hidden = [
+        'password',
+        'two_factor_secret',
+        'two_factor_recovery_codes',
+        'remember_token',
+    ];
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'email_verified_at' => 'datetime',
+            'password' => 'hashed',
+        ];
+    }
+
+    /**
+     * Get the user's initials
+     */
+    public function initials(): string
+    {
+        return Str::of($this->name)
+            ->explode(' ')
+            ->take(2)
+            ->map(fn($word) => Str::substr($word, 0, 1))
+            ->implode('');
+    }
+
+    public function scopeSearch($query, $keyword)
+    {
+        if (!$keyword) return $query;
+        return $query->where(function ($q) use ($keyword) {
+            $q->orWhere('name', 'like', "%{$keyword}%")
+
+                ->orWhere('username', 'like', "%{$keyword}%");
+        });
+    }
+
+    public function toRole()
+    {
+        return $this->belongsTo(roleModels::class, 'role_id');
+    }
+    public function toCabang()
+    {
+        return $this->belongsTo(cabangModel::class, 'branch_id');
+    }
+}

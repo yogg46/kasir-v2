@@ -31,6 +31,7 @@ class deliveryOrdersModels extends Model
 
             // Cari kode terakhir untuk hari ini, dan kunci baris agar tidak bentrok
             $latest = static::where('delivery_number', 'like', "{$prefix}-{$today}-%")
+            ->withTrashed()
                 ->orderByDesc('delivery_number')
                 ->lockForUpdate()
                 ->first();

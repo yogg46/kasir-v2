@@ -51,7 +51,24 @@
         </div>
     </div>
 
+    {{-- === Header Tabs === --}}
+    <div class="flex space-x-2  border-b border-gray-700">
+        <button wire:click="$set('viewMode', 'active')" class="px-4 py-2 font-medium text-sm rounded-t-lg transition
+            {{ $viewMode === 'active' 
+                ? 'bg-blue-600 text-white' 
+                : 'bg-gray-800 text-gray-400 hover:text-gray-200' }}">
+            🔹 Produk Aktif
+        </button>
+        <button wire:click="$set('viewMode', 'archived')" class="px-4 py-2 font-medium text-sm rounded-t-lg transition
+            {{ $viewMode === 'archived' 
+                ? 'bg-red-600 text-white' 
+                : 'bg-gray-800 text-gray-400 hover:text-gray-200' }}">
+            🗃️ Arsip
+        </button>
+    </div>
+
     {{-- Products Table --}}
+    @if($viewMode === 'active')
     <div class="bg-gray-900 rounded-lg shadow-sm overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full">
@@ -141,8 +158,7 @@
                                         d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                 </svg>
                             </button>
-                            <button wire:click="delete('{{ $product->id }}')"
-                                wire:confirm="Yakin ingin menghapus produk ini?"
+                            <button wire:click="confirmDelete('{{ $product->id }}')"
                                 class="text-red-600 hover:text-red-900">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -196,6 +212,137 @@
             </div>
         </div>
     </div>
+    @endif
+
+    {{-- Archived Products Table --}}
+    @if($viewMode === 'archived')
+    <div class="bg-gray-900 rounded-lg shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">Kode
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
+                            Produk</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
+                            Kategori</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">Tipe
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">Harga
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">Stok
+                        </th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-900 uppercase tracking-wider">Aksi
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-gray-900 divide-y divide-gray-200">
+                    @forelse($archivedProducts as $product)
+                    <tr class="hover:bg-zinc-800 transition">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
+                            {{ $product->code }}
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="text-sm font-medium text-white">{{ $product->name }}</div>
+                            @if($product->barcode)
+                            <div class="text-xs text-gray-500">{{ $product->barcode }}</div>
+                            @endif
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {{ $product->toKategori->name ?? '-' }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 py-1 text-xs font-semibold rounded-full
+                                    {{ $product->type === 'umkm' ? 'bg-purple-100 text-purple-800' : '' }}
+                                    {{ $product->type === 'seasonal' ? 'bg-yellow-100 text-yellow-800' : '' }}
+                                    {{ $product->type === 'regular' ? 'bg-green-100 text-green-800' : '' }}">
+                                {{ ucfirst($product->type) }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-white">
+                            @php
+                            $defaultPrice = $product->toHarga->where('is_default', true)->first();
+                            @endphp
+                            @if($defaultPrice)
+                            <div class="font-semibold">Rp {{ number_format($defaultPrice->price, 0, ',', '.') }}</div>
+                            <div class="text-xs text-gray-500">{{ $defaultPrice->unit_name }}</div>
+                            @else
+                            <span class="text-gray-400">Belum diset</span>
+                            @endif
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                            @php
+                            $totalStock = $product->toStocks->sum('quantity');
+                            @endphp
+                            <span class="font-semibold {{ $totalStock > 0 ? 'text-green-600' : 'text-red-600' }}">
+                                {{ $totalStock }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button wire:click="restore('{{ $product->id }}')"
+                                class="text-green-600 hover:text-green-900 mr-3">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M3 10h11M9 21V3m0 0L5 7m4-4l4 4M13 14h8m-4-4v8m0-8l-4 4m4-4l4 4" />
+                                </svg>
+                            </button>
+                            <button wire:click="confirmForceDelete('{{ $product->id }}')"
+                                class="text-red-600 hover:text-red-900">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </button>
+                        </td>
+                    </tr>
+                    @empty
+                    <tr>
+                        <td colspan="7" class="px-6 py-12 text-center text-gray-500">
+                            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                            </svg>
+                            <p class="mt-2">Tidak ada produk arsip ditemukan</p>
+                        </td>
+                    </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+        {{-- Pagination --}}
+        <div
+            class="px-6 py-4 border-t border-gray-800 bg-[#0e1525] text-gray-300 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            {{-- Per Page Selector --}}
+            <div class="flex items-center gap-2">
+                <label for="perPageArchived" class="text-sm">Show</label>
+                <select wire:model.live="perPageArchived" id="perPageArchived"
+                    class="bg-gray-800 border border-gray-700 text-gray-200 text-sm rounded-md px-2 py-1 focus:ring focus:ring-blue-500/40">
+                    <option value="5">5</option>
+                    <option value="10">10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                </select>
+                <span class="text-sm">entries</span>
+            </div>
+
+            {{-- Info dan Pagination --}}
+            <div class="flex items-center justify-between gap-4 w-full sm:w-auto">
+                <div class="text-sm">
+                    Showing {{ $archivedProducts->firstItem() }} to {{ $archivedProducts->lastItem() }} of
+                    {{ $archivedProducts->total() }} results
+                </div>
+
+                <div>
+                    {{ $archivedProducts->links('vendor.pagination.tailwind') }}
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
+
 
     {{-- Modal --}}
     @if($showModal)
@@ -223,7 +370,7 @@
             </div>
 
             {{-- Tabs --}}
-            @if (!$modalMode === 'create')
+            {{-- @if (!$modalMode === 'create') --}}
 
             <div class="border-b border-gray-700 bg-gray-900/60  ">
                 <nav class="flex space-x-2 px-6">
@@ -250,7 +397,7 @@
 
                 </nav>
             </div>
-            @endif
+            {{-- @endif --}}
 
 
             {{-- Body --}}
@@ -444,14 +591,17 @@
                 @elseif($activeTab === 'discounts')
                 <div class="space-y-4">
                     @if($modalMode !== 'view')
-                    <div class="border rounded-lg p-4">
-                        <h4 class="font-semibold mb-2">Tambah Diskon</h4>
-                        <div class="grid grid-cols-3 gap-3">
+                    <div class="border border-gray-700 bg-gray-800/60 rounded-xl p-5">
+                        <h4 class="font-semibold text-lg text-gray-100 mb-4">Tambah Diskon</h4>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <!-- Cabang -->
                             <div>
-                                <label class="text-sm">Cabang</label>
+                                <label class="text-sm text-gray-300">Cabang</label>
                                 <select wire:model="newDiscount.branch_id"
-                                    class="w-full bg-gray-900/60 border-gray-700 text-gray-100 border rounded-lg p-2">
-                                    <option value="">Semua Cabang</option>
+                                    class="w-full bg-gray-900/60 border border-gray-700 text-gray-100 rounded-lg p-2 focus:ring-2 focus:ring-blue-600 focus:outline-none">
+                                    <option value=""> -- Pilih Cabang -- </option>
+                                    <option value="all">Semua Cabang</option>
                                     @foreach($branches as $branch)
                                     <option value="{{ $branch->id }}">{{ $branch->name }}</option>
                                     @endforeach
@@ -460,10 +610,12 @@
                                 <p class="text-red-400 text-xs mt-1">{{ $message }}</p>
                                 @enderror
                             </div>
+
+                            <!-- Tipe -->
                             <div>
-                                <label class="text-sm">Tipe</label>
+                                <label class="text-sm text-gray-300">Tipe</label>
                                 <select wire:model="newDiscount.type"
-                                    class="w-full bg-gray-900/60 border-gray-700 text-gray-100 border rounded-lg p-2">
+                                    class="w-full bg-gray-900/60 border border-gray-700 text-gray-100 rounded-lg p-2 focus:ring-2 focus:ring-blue-600 focus:outline-none">
                                     <option value="">-- Pilih Tipe --</option>
                                     <option value="item">Per Item</option>
                                     <option value="transaction">Transaksi</option>
@@ -472,30 +624,67 @@
                                 <p class="text-red-400 text-xs mt-1">{{ $message }}</p>
                                 @enderror
                             </div>
+
+                            <!-- Persen Diskon -->
                             <div>
-                                <label class="text-sm">% Diskon</label>
+                                <label class="text-sm text-gray-300">% Diskon</label>
                                 <input type="number" wire:model="newDiscount.discount_percent"
-                                    class="w-full border rounded-lg p-2">
+                                    class="w-full bg-gray-900/60 border border-gray-700 text-gray-100 rounded-lg p-2 focus:ring-2 focus:ring-blue-600 focus:outline-none">
                                 @error('newDiscount.discount_percent')
                                 <p class="text-red-400 text-xs mt-1">{{ $message }}</p>
                                 @enderror
                             </div>
+
+                            <!-- Nominal -->
                             <div>
-                                <label class="text-sm">Nominal (Rp)</label>
+                                <label class="text-sm text-gray-300">Nominal (Rp)</label>
                                 <input type="number" wire:model="newDiscount.discount_amount"
-                                    class="w-full border rounded-lg p-2">
+                                    class="w-full bg-gray-900/60 border border-gray-700 text-gray-100 rounded-lg p-2 focus:ring-2 focus:ring-blue-600 focus:outline-none">
                                 @error('newDiscount.discount_amount')
                                 <p class="text-red-400 text-xs mt-1">{{ $message }}</p>
                                 @enderror
                             </div>
+
+                            <!-- Berlaku Dari -->
+                            <div>
+                                <label class="text-sm text-gray-300">Berlaku Dari</label>
+                                <input type="date" wire:model="newDiscount.valid_from"
+                                    class="w-full bg-gray-900/60 border border-gray-700 text-gray-100 rounded-lg p-2 focus:ring-2 focus:ring-blue-600 focus:outline-none">
+                                @error('newDiscount.valid_from')
+                                <p class="text-red-400 text-xs mt-1">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            <!-- Berlaku Sampai -->
+                            <div>
+                                <label class="text-sm text-gray-300">Berlaku Sampai</label>
+                                <input type="date" wire:model="newDiscount.valid_until"
+                                    class="w-full bg-gray-900/60 border border-gray-700 text-gray-100 rounded-lg p-2 focus:ring-2 focus:ring-blue-600 focus:outline-none">
+                                @error('newDiscount.valid_until')
+                                <p class="text-red-400 text-xs mt-1">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            <div class="md:col-span-3">
+                                <label class="text-sm text-gray-300">Catatan</label>
+                                <textarea wire:model="newDiscount.notes" rows="2"
+                                    class="w-full bg-gray-900/60 border border-gray-700 text-gray-100 rounded-lg p-2 focus:ring-2 focus:ring-blue-600 focus:outline-none resize-none"
+                                    placeholder="Tambahkan catatan jika diperlukan..."></textarea>
+                                @error('newDiscount.notes')
+                                <p class="text-red-400 text-xs mt-1">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            <!-- Tombol -->
                             <div class="flex items-end">
                                 <button wire:click="addDiscount"
-                                    class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+                                    class="w-full bg-blue-600 text-white font-medium px-4 py-2.5 rounded-lg hover:bg-blue-700 transition focus:ring-2 focus:ring-blue-600 focus:outline-none">
                                     Tambah
                                 </button>
                             </div>
                         </div>
                     </div>
+
                     @endif
 
                     <table class="w-full border border-gray-700 rounded-lg text-sm">
@@ -557,41 +746,7 @@
 
 
 
-    {{-- Notifikasi Toast --}}
-    <div x-data="{ show: false, message: '', type: 'success' }" x-on:notify.window="
-        show = true;
-        message = $event.detail.message;
-        type = $event.detail.type ?? 'success';
-        setTimeout(() => show = false, 3000);
-    " x-show="show" x-transition.opacity.duration.500ms class="fixed top-4 right-4 z-50">
-        <div :class="{
-            'bg-green-500': type === 'success',
-            'bg-red-500': type === 'error',
-            'bg-yellow-500': type === 'warning',
-        }" class="text-white px-5 py-3 rounded-lg shadow-lg flex items-center gap-3 min-w-[250px]">
-            <!-- Icon dinamis -->
-            <template x-if="type === 'success'">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                </svg>
-            </template>
 
-            <template x-if="type === 'error'">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-            </template>
-
-            <template x-if="type === 'warning'">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M12 9v2m0 4h.01M12 5a7 7 0 100 14a7 7 0 000-14z" />
-                </svg>
-            </template>
-
-            <span class="font-medium" x-text="message"></span>
-        </div>
-    </div>
 
 </div>
 

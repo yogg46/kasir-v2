@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class cabangModel extends Model
 {
-   use HasFactory, HasUuids, SoftDeletes;
+    use HasFactory, HasUuids, SoftDeletes;
     protected $table = 'branches_models';
     protected $fillable = ['code', 'name', 'address', 'phone', 'is_head_office'];
 
@@ -33,6 +33,7 @@ class cabangModel extends Model
         return DB::transaction(function () use ($prefix) {
             // Ambil kode terakhir, lock baris agar tidak diakses bersamaan
             $latest = static::where('code', 'like', "{$prefix}%")
+                ->withTrashed()
                 ->orderByDesc('code')
                 ->lockForUpdate()
                 ->first();

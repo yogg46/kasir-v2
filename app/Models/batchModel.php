@@ -33,6 +33,7 @@ class batchModel extends Model
 
             // Cari kode terakhir untuk hari ini, dan kunci baris agar tidak bentrok
             $latest = static::where('code', 'like', "{$prefix}-{$today}-%")
+            ->withTrashed()
                 ->orderByDesc('code')
                 ->lockForUpdate()
                 ->first();

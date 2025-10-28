@@ -30,6 +30,7 @@ class supliersModels extends Model
         return DB::transaction(function () use ($prefix) {
             // Ambil kode terakhir, lock baris agar tidak diakses bersamaan
             $latest = static::where('code', 'like', "{$prefix}%")
+            ->withTrashed()
                 ->orderByDesc('code')
                 ->lockForUpdate()
                 ->first();

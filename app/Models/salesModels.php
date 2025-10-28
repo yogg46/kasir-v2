@@ -93,6 +93,7 @@ class salesModels extends Model
 
             // Ambil invoice terakhir untuk hari ini dengan lock
             $latest = static::where('invoice_number', 'like', "{$prefix}-{$today}-%")
+            ->withTrashed()
                 ->orderByDesc('invoice_number')
                 ->lockForUpdate()
                 ->first();

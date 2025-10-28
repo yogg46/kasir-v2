@@ -44,6 +44,7 @@ class produkModel extends Model
         return DB::transaction(function () use ($prefix) {
             // Ambil kode terakhir, lock baris agar tidak diakses bersamaan
             $latest = static::where('code', 'like', "{$prefix}%")
+                ->withTrashed()
                 ->orderByDesc('code')
                 ->lockForUpdate()
                 ->first();
@@ -119,6 +120,11 @@ class produkModel extends Model
     public function toBatches()
     {
         return $this->hasMany(batchModel::class, 'product_id');
+    }
+
+    public function toDiskon()
+    {
+        return $this->hasMany(diskonModel::class, 'product_id');
     }
 
 
