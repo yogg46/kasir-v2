@@ -46,7 +46,7 @@ class prodectStockSeeder extends Seeder
         $suppliers  = supliersModels::factory()->count(5)->create();
 
         // 🧰 Produk
-        $products = produkModel::factory()->count(10)->create();
+        $products = produkModel::factory()->count(100)->create();
 
         foreach ($products as $product) {
             foreach ($branches as $branch) {
@@ -60,28 +60,28 @@ class prodectStockSeeder extends Seeder
                     [
                         'unit_name' => 'Pcs',
                         'unit_qty' => 1,
-                        'price' => rand(4000, 7000),
+                        'price' => rand(40000, 70000),
                         'notes' => 'Harga satuan eceran',
                         'is_default' => true,
                     ],
                     [
                         'unit_name' => 'Grosir',
                         'unit_qty' => 3,
-                        'price' => rand(3500, 6000),
+                        'price' => rand(35000, 60000),
                         'notes' => 'Harga grosir minimum 3 pcs',
                         'is_default' => false,
                     ],
                     [
                         'unit_name' => 'Dus',
                         'unit_qty' => 12,
-                        'price' => rand(3000, 5500),
+                        'price' => rand(30000, 55000),
                         'notes' => 'Harga per dus isi 12 pcs',
                         'is_default' => false,
                     ],
                     [
                         'unit_name' => 'Karton',
                         'unit_qty' => 24,
-                        'price' => rand(2800, 5200),
+                        'price' => rand(28000, 52000),
                         'notes' => 'Harga per karton isi 24 pcs',
                         'is_default' => false,
                     ],
@@ -108,7 +108,7 @@ class prodectStockSeeder extends Seeder
                         'unit_qty'        => $data['unit_qty'],
                         'price'           => $data['price'],
                         'old_price'       => null,
-                        'purchase_price'  => rand(2500, 3500),
+                        'purchase_price'  => rand(25000, 35000),
                         'is_default'      => $data['is_default'],
                         'valid_from'      => now(),
                         'valid_until'     => null,
@@ -121,7 +121,7 @@ class prodectStockSeeder extends Seeder
                     'product_id'   => $product->id,
                     // 'branch_id'    => $branch->id,
                     'warehouse_id' => $warehouse->id,
-                    'quantity'     => fake()->numberBetween(5, 200),
+                    'quantity'     => fake()->numberBetween(5, 800),
                 ]);
             }
         }

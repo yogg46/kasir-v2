@@ -87,4 +87,30 @@ class User extends Authenticatable
     {
         return $this->belongsTo(cabangModel::class, 'branch_id');
     }
+
+    public function getNamaCabangAttribute()
+    {
+        $role = strtolower(optional($this->toRole)->name ?? '');
+        $cabang = optional($this->toCabang)->name;
+
+        // Jika tidak ada cabang sama sekali
+        if (!$this->toCabang) {
+            return 'Tidak ada cabang';
+        }
+
+        // Jika bukan role gudang → tampilkan name cabang
+        if ($role !== 'gudang') {
+            return $cabang ?? 'Tidak ada cabang';
+        }
+
+        // Jika role gudang → cek jumlah gudang di cabangnya
+        $gudangs = $this->toCabang->toGudang ?? collect();
+
+        if ($gudangs->count() === 1) {
+            return $gudangs->first()->name ?? 'Tidak ada gudang';
+        }
+
+        // Jika lebih dari satu gudang → tampilkan name cabang
+        return $cabang ?? 'Tidak ada cabang';
+    }
 }

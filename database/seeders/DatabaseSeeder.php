@@ -25,11 +25,20 @@ class DatabaseSeeder extends Seeder
         roleModels::create(['role' => 'gudang']);
         roleModels::create(['role' => 'manajer']);
         roleModels::create(['role' => 'owner']);
+        roleModels::create(['role' => 'Super Admin']);
 
 
         // User
 
         $idB = cabangModel::where('name', 'Cabang Utama Surakarta')->first();
+        User::create([
+            'name' => 'Admin Super',
+            // 'email' => 'admin@admin.com',
+            'username' => 'Sadmin',
+            'password' => bcrypt('password'),
+            'role_id' => 6,
+            'branch_id' => $idB->id,
+        ]);
         User::create([
             'name' => 'Admin',
             // 'email' => 'admin@admin.com',

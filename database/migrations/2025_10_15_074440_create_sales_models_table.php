@@ -15,7 +15,7 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->foreignUuid('branch_id')->constrained('branches_models')->onDelete('cascade'); // FK ke branches_models
             $table->foreignUuid('cashier_id')->constrained('users')->onDelete('cascade'); // FK ke users_models
-            $table->date('sale_date');
+            $table->dateTime('sale_date');
             $table->string('invoice_number')->unique();
             $table->decimal('subtotal',15,2)->default(0);
             $table->decimal('total_amount',15,2)->default(0);

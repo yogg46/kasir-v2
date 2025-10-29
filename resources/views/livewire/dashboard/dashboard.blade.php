@@ -46,6 +46,7 @@
                 <thead class="text-gray-500 border-b border-gray-700">
                     <tr>
                         <th class="py-2 text-left">Produk</th>
+                        <th class="py-2 text-center"> Gudang </th>
                         <th class="py-2 text-center">Stok</th>
                     </tr>
                 </thead>
@@ -53,6 +54,7 @@
                     @forelse($lowStockProducts as $s)
                     <tr class="border-b border-gray-800">
                         <td class="py-2">{{ $s->toProduk->name ?? '-' }}</td>
+                        <td class="py-2 text-center">{{ $s->toGudang->name ?? '-' }}</td>
                         <td class="py-2 text-center">{{ $s->quantity }}</td>
                     </tr>
                     @empty

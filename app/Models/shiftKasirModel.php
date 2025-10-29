@@ -22,7 +22,8 @@ class shiftKasirModel extends Model
         'cash_in',
         'cash_out',
         'final_cash',
-        'status'
+        'status',
+        // 'notes',
     ];
 
     protected $casts = [
@@ -67,6 +68,27 @@ class shiftKasirModel extends Model
                 if ($diff == 0) return 'balanced';
                 return $diff > 0 ? 'over' : 'short';
             }
+        );
+    }
+
+    // nama Kasir
+    protected function cashierName(): Attribute
+    {
+        return Attribute::make(
+            get: fn() => $this->toKasir ? $this->toKasir->name : 'Unknown'
+        );
+    }
+
+    public function toSales()
+    {
+        return $this->hasMany(salesModels::class, 'cashier_id', 'cashier_id')
+            ->whereBetween('sale_date', [$this->shift_start, $this->shift_end]);
+    }
+
+    protected function totalSales(): Attribute
+    {
+        return Attribute::make(
+            get: fn() => $this->toSales()->sum('total_amount')
         );
     }
 }

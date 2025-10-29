@@ -29,6 +29,10 @@ class salesModels extends Model
         'notes'
     ];
 
+    protected $casts = [
+        'sale_date' => 'datetime',
+    ];
+
     protected static function boot()
     {
         parent::boot();

@@ -37,6 +37,7 @@ class batchModel extends Model
 
             // Cari kode terakhir untuk hari ini, dan kunci baris agar tidak bentrok
             $latest = static::where('code', 'like', "{$prefix}-{$today}-%")
+            ->withTrashed()
                 ->orderByDesc('code')
                 ->lockForUpdate()
                 ->first();
@@ -114,7 +115,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class cabangModel extends Model
 {
-   use HasFactory, HasUuids, SoftDeletes;
+    use HasFactory, HasUuids, SoftDeletes;
     protected $table = 'branches_models';
     protected $fillable = ['code', 'name', 'address', 'phone', 'is_head_office'];
 
@@ -137,6 +138,7 @@ class cabangModel extends Model
         return DB::transaction(function () use ($prefix) {
             // Ambil kode terakhir, lock baris agar tidak diakses bersamaan
             $latest = static::where('code', 'like', "{$prefix}%")
+                ->withTrashed()
                 ->orderByDesc('code')
                 ->lockForUpdate()
                 ->first();
@@ -268,6 +270,7 @@ class deliveryOrdersModels extends Model
 
             // Cari kode terakhir untuk hari ini, dan kunci baris agar tidak bentrok
             $latest = static::where('delivery_number', 'like', "{$prefix}-{$today}-%")
+            ->withTrashed()
                 ->orderByDesc('delivery_number')
                 ->lockForUpdate()
                 ->first();
@@ -389,6 +392,7 @@ class gudangModel extends Model
         return DB::transaction(function () use ($prefix) {
             // Ambil kode terakhir, lock baris agar tidak diakses bersamaan
             $latest = static::where('code', 'like', "{$prefix}%")
+            ->withTrashed()
                 ->orderByDesc('code')
                 ->lockForUpdate()
                 ->first();
@@ -737,6 +741,7 @@ class penerimaanBarangModel extends Model
 
             // Cari kode terakhir untuk hari ini, dan kunci baris agar tidak bentrok
             $latest = static::where('receipt_number', 'like', "{$prefix}-{$today}-%")
+            ->withTrashed()
                 ->orderByDesc('receipt_number')
                 ->lockForUpdate()
                 ->first();
@@ -816,6 +821,7 @@ class produkModel extends Model
         return DB::transaction(function () use ($prefix) {
             // Ambil kode terakhir, lock baris agar tidak diakses bersamaan
             $latest = static::where('code', 'like', "{$prefix}%")
+                ->withTrashed()
                 ->orderByDesc('code')
                 ->lockForUpdate()
                 ->first();
@@ -891,6 +897,11 @@ class produkModel extends Model
     public function toBatches()
     {
         return $this->hasMany(batchModel::class, 'product_id');
+    }
+
+    public function toDiskon()
+    {
+        return $this->hasMany(diskonModel::class, 'product_id');
     }
 
 
@@ -1024,6 +1035,7 @@ class purchaseOrdersModels extends Model
 
             // Cari kode terakhir untuk hari ini, dan kunci baris agar tidak bentrok
             $latest = static::where('order_number', 'like', "{$prefix}-{$today}-%")
+            ->withTrashed()
                 ->orderByDesc('order_number')
                 ->lockForUpdate()
                 ->first();
@@ -1142,6 +1154,7 @@ class returModel extends Model
 
             // Cari kode terakhir untuk hari ini, dan kunci baris agar tidak bentrok
             $latest = static::where('return_number', 'like', "{$prefix}-{$today}-%")
+            ->withTrashed()
                 ->orderByDesc('return_number')
                 ->lockForUpdate()
                 ->first();
@@ -1215,6 +1228,7 @@ class roleModels extends Model
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
@@ -1232,6 +1246,15 @@ class saleitemsModels extends Model
     public function toProduk()
     {
         return $this->belongsTo(produkModel::class, 'product_id');
+    }
+
+
+
+     protected function productName(): Attribute
+    {
+        return Attribute::make(
+            get: fn() => $this->toProduk ? $this->toProduk->name : 'Unknown'
+        );
     }
 }
 
@@ -1267,6 +1290,10 @@ class salesModels extends Model
         'payment_method',
         'status',
         'notes'
+    ];
+
+    protected $casts = [
+        'sale_date' => 'datetime',
     ];
 
     protected static function boot()
@@ -1333,6 +1360,7 @@ class salesModels extends Model
 
             // Ambil invoice terakhir untuk hari ini dengan lock
             $latest = static::where('invoice_number', 'like', "{$prefix}-{$today}-%")
+            ->withTrashed()
                 ->orderByDesc('invoice_number')
                 ->lockForUpdate()
                 ->first();
@@ -1455,7 +1483,13 @@ class shiftKasirModel extends Model
         'cash_in',
         'cash_out',
         'final_cash',
-        'status'
+        'status',
+        // 'notes',
+    ];
+
+    protected $casts = [
+        'shift_start' => 'datetime',
+        'shift_end' => 'datetime',
     ];
 
     public function toKasir()
@@ -1495,6 +1529,27 @@ class shiftKasirModel extends Model
                 if ($diff == 0) return 'balanced';
                 return $diff > 0 ? 'over' : 'short';
             }
+        );
+    }
+
+    // nama Kasir
+    protected function cashierName(): Attribute
+    {
+        return Attribute::make(
+            get: fn() => $this->toKasir ? $this->toKasir->name : 'Unknown'
+        );
+    }
+
+    public function toSales()
+    {
+        return $this->hasMany(salesModels::class, 'cashier_id', 'cashier_id')
+            ->whereBetween('sale_date', [$this->shift_start, $this->shift_end]);
+    }
+
+    protected function totalSales(): Attribute
+    {
+        return Attribute::make(
+            get: fn() => $this->toSales()->sum('total_amount')
         );
     }
 }
@@ -1567,6 +1622,7 @@ class supliersModels extends Model
         return DB::transaction(function () use ($prefix) {
             // Ambil kode terakhir, lock baris agar tidak diakses bersamaan
             $latest = static::where('code', 'like', "{$prefix}%")
+            ->withTrashed()
                 ->orderByDesc('code')
                 ->lockForUpdate()
                 ->first();

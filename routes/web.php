@@ -13,13 +13,15 @@ use App\Livewire\MasterData\CabangToko;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Request;
 use App\Livewire\MasterData\ProductList;
+use App\Http\Controllers\PrintController;
 use App\Livewire\MasterData\UserManagement;
+use App\Livewire\MasterData\SupplierManagement;
 
 Route::get('/', function () {
     return redirect()->route('login');
 })->name('home');
 
-Route::get('/dashboard',Dashboard::class)
+Route::get('/dashboard', Dashboard::class)
     ->middleware(['auth'])
     ->name('dashboard');
 
@@ -30,13 +32,16 @@ Route::middleware(['auth'])->group(function () {
     Route::get('settings/password', Password::class)->name('settings.password');
     Route::get('settings/appearance', Appearance::class)->name('settings.appearance');
 
-    Route::get('pos',POS::class)->name('pos');
-    Route::get('list-toko',CabangToko::class)->name('list-toko');
-    Route::get('users',UserManagement::class)->name('users');
+    Route::get('/shift/print/{shift}', [PrintController::class, 'printShift'])->name('shift.print');
+
+    Route::get('/suppliers', SupplierManagement::class)->name('suppliers.index');
+
+
+    Route::get('pos', POS::class)->name('pos');
+    Route::get('list-toko', CabangToko::class)->name('list-toko');
+    Route::get('users', UserManagement::class)->name('users');
     Route::get('products', ProductList::class)->name('products.index');
     Route::get('shift-kasir', ShiftKasir::class)->name('shift-kasir');
-
-
 });
 
 

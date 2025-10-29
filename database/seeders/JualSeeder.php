@@ -2,21 +2,17 @@
 
 namespace Database\Seeders;
 
+use Illuminate\Database\Seeder;
 use App\Models\User;
 use App\Models\hargaModel;
 use App\Models\cabangModel;
 use App\Models\salesModels;
 use App\Models\stockModels;
 use App\Models\saleitemsModels;
-use Illuminate\Database\Seeder;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use App\Models\shiftKasirModel;
 
 class JualSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
         $branches = cabangModel::all();
@@ -26,27 +22,19 @@ class JualSeeder extends Seeder
             return;
         }
 
-        // Ambil atau buat user kasir
-        $cashiers = User::whereHas('toRole', function ($query) {
-            $query->where('name', 'kasir');
-        })->get();
+        // Ambil user dengan role kasir
+        $cashiers = User::whereHas('toRole', fn($q) => $q->where('name', 'kasir'))->get();
 
-        // Jika tidak ada kasir, buat dummy user
+        // Jika belum ada, buat dummy kasir
         if ($cashiers->isEmpty()) {
             $cashiers = collect([
                 User::firstOrCreate(
                     ['email' => 'kasir1@example.com'],
-                    [
-                        'name' => 'Kasir 1',
-                        'password' => bcrypt('password'),
-                    ]
+                    ['name' => 'Kasir 1', 'password' => bcrypt('password')]
                 ),
                 User::firstOrCreate(
                     ['email' => 'kasir2@example.com'],
-                    [
-                        'name' => 'Kasir 2',
-                        'password' => bcrypt('password'),
-                    ]
+                    ['name' => 'Kasir 2', 'password' => bcrypt('password')]
                 ),
             ]);
         }
@@ -54,78 +42,81 @@ class JualSeeder extends Seeder
         $paymentMethods = ['cash', 'qris'];
         $statuses = ['paid'];
 
-        // Buat transaksi untuk 7 hari terakhir
         $transactionsCreated = 0;
 
+        // Buat transaksi untuk 7 hari terakhir
         for ($day = 0; $day < 7; $day++) {
-            // Random 5-15 transaksi per hari
             $transactionsPerDay = rand(5, 15);
 
             foreach (range(1, $transactionsPerDay) as $index) {
                 $branch = $branches->random();
                 $cashier = $cashiers->random();
 
-                // Random waktu dalam hari tersebut (jam operasional 08:00 - 20:00)
+                // Tentukan waktu transaksi dalam jam kerja (08:00–20:00)
                 $saleDate = now()
                     ->subDays($day)
                     ->setHour(rand(8, 20))
                     ->setMinute(rand(0, 59))
-                    ->setSecond(rand(0, 59))
-                    ->format('Y-m-d H:i:s');
+                    ->setSecond(rand(0, 59));
 
-                // Ambil stok yang tersedia di cabang ini (quantity > 0)
+                // Pastikan shift kasir untuk hari itu ada (atau buat)
+                $shiftStart = $saleDate->copy()->startOfDay()->addHours(8);
+                $shiftEnd   = $saleDate->copy()->startOfDay()->addHours(20);
+
+                $shift = shiftKasirModel::firstOrCreate(
+                    [
+                        'cashier_id' => $cashier->id,
+                        'branch_id' => $branch->id,
+                        'shift_start' => $shiftStart,
+                    ],
+                    [
+                        'shift_end' => $shiftEnd,
+                        'initial_cash' => rand(100000, 300000),
+                        'cash_in' => 0,
+                        'cash_out' => 0,
+                        'final_cash' => 0,
+                        'status' => 'open',
+                    ]
+                );
+
+                // Ambil stok yang tersedia di cabang
                 $warehouse = $branch->toGudang()->first();
-                $warehouseId = $warehouse?->id;
+                if (!$warehouse) continue;
 
-                // Ambil stok yang tersedia di cabang ini (quantity > 0)
-                $availableStocks = stockModels::where('warehouse_id', $warehouseId)
+                $availableStocks = stockModels::where('warehouse_id', $warehouse->id)
                     ->where('quantity', '>', 0)
-                    ->with(['toProduk', 'toGudang'])
+                    ->with(['toProduk'])
                     ->get();
 
                 if ($availableStocks->isEmpty()) {
-                    $this->command->warn("⚠️ Tidak ada stok tersedia untuk cabang: {$branch->name}");
+                    $this->command->warn("⚠️ Tidak ada stok tersedia untuk cabang {$branch->name}");
                     continue;
                 }
 
-                // Pilih 1-5 produk secara acak
+                // Pilih produk acak
                 $selectedStocks = $availableStocks->random(min(rand(1, 5), $availableStocks->count()));
-
                 $subtotal = 0;
                 $discountTotal = 0;
                 $saleItems = [];
 
                 foreach ($selectedStocks as $stock) {
                     $product = $stock->toProduk;
+                    if (!$product) continue;
 
-                    // Ambil harga yang tersedia untuk produk ini di cabang ini
                     $prices = hargaModel::where('product_id', $product->id)
                         ->where('branch_id', $branch->id)
                         ->get();
 
-                    if ($prices->isEmpty()) {
-                        continue;
-                    }
+                    if ($prices->isEmpty()) continue;
 
-                    // Pilih salah satu unit harga secara acak
                     $selectedPrice = $prices->random();
-
-                    // Tentukan quantity yang dibeli (tidak melebihi stok)
-                    // Untuk unit dengan qty > 1, sesuaikan dengan unit_qty
                     $maxQtyInUnits = floor($stock->quantity / $selectedPrice->unit_qty);
 
-                    if ($maxQtyInUnits < 1) {
-                        // Skip jika stok tidak cukup untuk 1 unit
-                        continue;
-                    }
+                    if ($maxQtyInUnits < 1) continue;
 
-                    // Random quantity pembelian (dalam unit yang dipilih)
                     $quantityInUnits = rand(1, min($maxQtyInUnits, 10));
-
-                    // Total quantity dalam satuan pcs
                     $totalQuantity = $quantityInUnits * $selectedPrice->unit_qty;
 
-                    // Hitung discount acak (0-20%)
                     $discountPercent = rand(0, 20);
                     $itemPrice = $selectedPrice->price;
                     $itemDiscount = ($itemPrice * $quantityInUnits * $discountPercent) / 100;
@@ -134,7 +125,6 @@ class JualSeeder extends Seeder
                     $subtotal += $itemSubtotal;
                     $discountTotal += $itemDiscount;
 
-                    // Simpan data item untuk nanti
                     $saleItems[] = [
                         'stock' => $stock,
                         'product_id' => $product->id,
@@ -147,28 +137,24 @@ class JualSeeder extends Seeder
                     ];
                 }
 
-                // Skip jika tidak ada item yang valid
-                if (empty($saleItems)) {
-                    continue;
-                }
+                if (empty($saleItems)) continue;
 
-                $totalAmount = $subtotal;
                 $status = $statuses[array_rand($statuses)];
 
-                // Buat transaksi sales
+                // Buat transaksi penjualan
                 $sale = salesModels::create([
                     'branch_id' => $branch->id,
                     'cashier_id' => $cashier->id,
                     'sale_date' => $saleDate,
                     'subtotal' => $subtotal,
-                    'total_amount' => $totalAmount,
+                    'total_amount' => $subtotal,
                     'discount_total' => $discountTotal,
                     'payment_method' => $paymentMethods[array_rand($paymentMethods)],
                     'status' => $status,
                     'notes' => rand(0, 1) ? null : 'Transaksi ' . fake()->sentence(3),
                 ]);
 
-                // Buat sale items dan kurangi stok (hanya untuk status completed)
+                // Tambahkan item dan kurangi stok
                 foreach ($saleItems as $item) {
                     saleitemsModels::create([
                         'sale_id' => $sale->id,
@@ -180,15 +166,24 @@ class JualSeeder extends Seeder
                         'subtotal' => $item['subtotal'],
                     ]);
 
-                    // Kurangi stok jika transaksi completed
-                    if ($status === 'completed') {
+                    if ($status === 'paid') {
                         $item['stock']->decrement('quantity', $item['total_pcs']);
                     }
                 }
 
                 $transactionsCreated++;
+
+                $sif = shiftKasirModel::all();
+
+                foreach ($sif as $shif) {
+                    $shif->update([
+                        'cash_in' => $shif->totalSales ?? 0,
+                        'final_cash' => $shif->initial_cash + $shif->totalSales ?? 0,
+                        'status'=>'closed',
+                    ]);
+                }
                 $dayLabel = $day === 0 ? 'Hari ini' : "$day hari lalu";
-                $this->command->info("✅ Sale #{$sale->invoice_number} dibuat untuk {$branch->name} ({$dayLabel}) dengan " . count($saleItems) . " item");
+                $this->command->info("✅ Sale #{$sale->invoice_number} dibuat untuk {$branch->name} oleh {$cashier->name} ({$dayLabel})");
             }
         }
 

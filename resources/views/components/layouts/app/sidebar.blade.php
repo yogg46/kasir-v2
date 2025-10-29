@@ -27,6 +27,8 @@
             <flux:navlist.group :heading="__('Master Data')" class="grid">
                 <flux:navlist.item icon="home" :href="route('products.index')" :current="request()->routeIs('products')"
                     wire:navigate>{{ __('Manajemen Produk') }}</flux:navlist.item>
+                <flux:navlist.item icon="home" :href="route('suppliers.index')" :current="request()->routeIs('suppliers')"
+                    wire:navigate>{{ __('Manajemen Supplier') }}</flux:navlist.item>
 
             </flux:navlist.group>
             <flux:navlist.group :heading="__('Kasir')" class="grid">
